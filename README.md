@@ -1,2 +1,2 @@
-# flatpak2rpm
+# flatpak2spec
 A Rust-based CLI tool to generate an RPM spec file from a Flatpak application repo.
