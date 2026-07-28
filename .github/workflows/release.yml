@@ -1,0 +1,42 @@
+name: build-attest-release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v4.2.0
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@5c5e2f3a9a3f4f2c9c3f6a3a9d7e8b2a1f3d4c5e # stable
+        with:
+          toolchain: stable
+
+      - name: Build binary
+        run: cargo build --release
+
+      - name: Attest binary (SLSA Provenance)
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-path: target/release/flatpak2spec
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: target/release/flatpak2spec
+          body: |
+            ## Release ${{ github.ref_name }}
+            Built and attested automatically with GitHub Actions.
