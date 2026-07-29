@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Infiniti151
 
 use anyhow::{Context, Result};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub struct RepoResolver;
@@ -17,17 +17,12 @@ impl RepoResolver {
             || input.starts_with("https://")
             || input.starts_with("git@")
         {
-            // Extract a clean app name from the URL (e.g., .../repo.git -> repo)
-            let repo_name = input
-                .trim_end_matches('/')
-                .trim_end_matches(".git")
-                .split('/')
-                .last()
-                .unwrap_or("app");
+            // Re-use our extract_repo_name helper
+            let repo_name = Self::extract_repo_name(Path::new(input), input);
 
             let workspace_dir = std::env::temp_dir()
                 .join("flatpak2spec_workspace")
-                .join(repo_name);
+                .join(&repo_name);
 
             // Check if workspace is already fully populated and is a valid git repository
             if workspace_dir.exists() && workspace_dir.join(".git").exists() {
@@ -92,5 +87,24 @@ impl RepoResolver {
             }
             Ok(path)
         }
+    }
+
+    /// Extracts the repository name from a Git URL or local workspace directory path.
+    /// Preserves exact upstream casing and formatting (e.g., "NetPeek", "mission-center").
+    pub fn extract_repo_name(workspace_path: &Path, repo_url: &str) -> String {
+        let clean_url = repo_url.trim_end_matches('/').trim_end_matches(".git");
+
+        if let Some(repo_name) = clean_url.split('/').last() {
+            if !repo_name.is_empty() && !repo_name.starts_with('.') {
+                return repo_name.to_string();
+            }
+        }
+
+        // Fallback to workspace directory name
+        workspace_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("app")
+            .to_string()
     }
 }

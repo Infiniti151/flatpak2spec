@@ -22,6 +22,11 @@ impl SpecGenerator {
     ) -> String {
         let mut spec = String::new();
 
+        let app_id = manifest.get_app_id().unwrap_or("app");
+
+        // %global app_id
+        spec.push_str(&format!("{:16}{} {}\n\n", "%global", "app_id", app_id));
+
         // 1. Preamble / Header block
         let header = HeaderSection::generate(manifest, meson, workspace_path, repo_url, bug_url);
         spec.push_str(&header);
@@ -44,7 +49,7 @@ impl SpecGenerator {
         spec.push_str(&build);
 
         // 5. Scriptlets (%post, %postun, %posttrans)
-        let scriptlets = ScriptletsSection::generate(meson);
+        let scriptlets = ScriptletsSection::generate(workspace_path);
         if !scriptlets.is_empty() {
             spec.push_str(&scriptlets);
             if !scriptlets.ends_with("\n\n") {

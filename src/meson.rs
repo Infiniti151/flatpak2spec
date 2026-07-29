@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Infiniti151
 
+use crate::utils;
 use anyhow::Result;
 use regex::Regex;
 use std::collections::BTreeSet;
@@ -38,43 +39,22 @@ pub struct MesonProject {
 impl MesonProject {
     pub fn parse_from_workspace(workspace_path: &Path) -> Result<Self> {
         let mut project = Self::default();
-        Self::scan_directory_for_meson(workspace_path, workspace_path, &mut project)?;
 
-        if project.license.is_none() {
-            project.license = Self::extract_license_from_metainfo(workspace_path);
-        }
+        let meson_files = utils::find_matching_files(workspace_path, &["meson.build"]);
+        let root_meson = workspace_path.join("meson.build");
 
-        Ok(project)
-    }
-
-    fn scan_directory_for_meson(
-        root_path: &Path,
-        current_dir: &Path,
-        project: &mut MesonProject,
-    ) -> Result<()> {
-        let meson_path = current_dir.join("meson.build");
-        if meson_path.exists() {
-            if let Ok(content) = fs::read_to_string(&meson_path) {
-                let is_root = current_dir == root_path;
+        for file_path in meson_files {
+            if let Ok(content) = fs::read_to_string(&file_path) {
+                let is_root = file_path == root_meson;
                 project.parse_content(&content, is_root);
             }
         }
 
-        if let Ok(entries) = fs::read_dir(current_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir()
-                    && !path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .map_or(false, |s| s.starts_with('.'))
-                {
-                    let _ = Self::scan_directory_for_meson(root_path, &path, project);
-                }
-            }
+        if project.license.is_none() && utils::has_metainfo_file(workspace_path) {
+            project.license = Self::extract_license_from_metainfo(workspace_path);
         }
 
-        Ok(())
+        Ok(project)
     }
 
     fn parse_content(&mut self, content: &str, is_root: bool) {
@@ -82,10 +62,10 @@ impl MesonProject {
             // Extract project name
             let name_re = Regex::new(r#"(?i)project\s*\(\s*['"]([^'"]+)['"]"#).unwrap();
             if let Some(caps) = name_re.captures(content) {
-                self.name = Some(caps[1].to_string());
+                self.name = Some(caps[1].to_lowercase());
             }
 
-            // Extract minimum meson version (strip extra '>=' if present)
+            // Extract minimum meson version
             let meson_ver_re =
                 Regex::new(r#"(?i)meson_version\s*:\s*['"]\s*(?:>=)?\s*([^'"]+)['"]"#).unwrap();
             if let Some(caps) = meson_ver_re.captures(content) {
@@ -101,16 +81,14 @@ impl MesonProject {
             // Extract languages
             let lang_re = Regex::new(r#"project\s*\([^)]*?\)"#).unwrap();
             if let Some(mat) = lang_re.find(content) {
-                let proj_call = mat.as_str();
                 let string_re = Regex::new(r#"['"]([^'"]+)['"]"#).unwrap();
-
                 let mut matches: Vec<String> = string_re
-                    .captures_iter(proj_call)
+                    .captures_iter(mat.as_str())
                     .map(|cap| cap[1].to_string())
                     .collect();
 
                 if !matches.is_empty() {
-                    matches.remove(0);
+                    matches.remove(0); // Skip app name
                     self.languages = matches
                         .into_iter()
                         .filter(|s| !s.contains(':') && !s.contains('='))
@@ -119,7 +97,7 @@ impl MesonProject {
             }
         }
 
-        // Extract subdirs: e.g. subdir('data'), subdir('src'), subdir('po')
+        // Extract subdirs
         let subdir_re = Regex::new(r#"(?i)subdir\s*\(\s*['"]([^'"]+)['"]\s*\)"#).unwrap();
         for cap in subdir_re.captures_iter(content) {
             let sub = cap[1].trim().to_string();
@@ -128,7 +106,7 @@ impl MesonProject {
             }
         }
 
-        // Check for Python / PyGObject usage
+        // Check for Python / PyGObject
         if content.contains("import('python')")
             || content.contains("find_installation")
             || content.contains("python3")
@@ -152,7 +130,7 @@ impl MesonProject {
             }
         }
 
-        // Extract pkgconfig dependencies and strip duplicate operators from version string
+        // Extract pkgconfig dependencies
         let dep_re = Regex::new(
             r#"(?i)dependency\s*\(\s*['"]([^'"]+)['"](?:\s*,\s*version\s*:\s*['"]\s*(?:>=)?\s*([^'"]+)['"])?"#,
         )
@@ -173,10 +151,8 @@ impl MesonProject {
             self.pkgconfig_deps.insert(dep_str);
         }
 
-        // Check for blueprint usage
-        if content.contains("blueprint-compiler")
-            || content.contains("find_program('blueprint-compiler')")
-        {
+        // Check blueprint compiler
+        if content.contains("blueprint-compiler") {
             self.modules.has_blueprint = true;
         }
 
@@ -185,9 +161,8 @@ impl MesonProject {
             let post_install_re = Regex::new(r"(?s)gnome\.post_install\s*\((.*?)\)").unwrap();
             if let Some(caps) = post_install_re.captures(content) {
                 let block = &caps[1];
-                let bool_arg = |key: &str| -> bool {
-                    let pattern = format!(r#"{}\s*:\s*(true|false)"#, key);
-                    Regex::new(&pattern)
+                let bool_arg = |key: &str| {
+                    Regex::new(&format!(r#"{}\s*:\s*(true|false)"#, key))
                         .ok()
                         .and_then(|re| re.captures(block))
                         .map(|c| &c[1] == "true")
@@ -205,27 +180,14 @@ impl MesonProject {
 
     fn extract_license_from_metainfo(workspace_path: &Path) -> Option<String> {
         let re = Regex::new(r"<project_license>(.*?)</project_license>").ok()?;
-        Self::search_metainfo_license(workspace_path, &re)
-    }
+        let files = utils::find_matching_files(workspace_path, &["metainfo.xml", "appdata.xml"]);
 
-    fn search_metainfo_license(dir: &Path, re: &Regex) -> Option<String> {
-        let entries = fs::read_dir(dir).ok()?;
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                if let Some(lic) = Self::search_metainfo_license(&path, re) {
-                    return Some(lic);
-                }
-            } else if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                let lower = name.to_lowercase();
-                if lower.contains("metainfo.xml") || lower.contains("appdata.xml") {
-                    if let Ok(content) = fs::read_to_string(&path) {
-                        if let Some(caps) = re.captures(&content) {
-                            let lic = caps[1].trim().to_string();
-                            if !lic.is_empty() {
-                                return Some(lic);
-                            }
-                        }
+        for path in files {
+            if let Ok(content) = fs::read_to_string(path) {
+                if let Some(caps) = re.captures(&content) {
+                    let lic = caps[1].trim().to_string();
+                    if !lic.is_empty() {
+                        return Some(lic);
                     }
                 }
             }
@@ -247,7 +209,10 @@ impl MesonProject {
     pub fn is_rust_project(&self, workspace_path: &Path) -> bool {
         workspace_path.join("Cargo.toml").exists()
             || workspace_path.join("src/Cargo.toml").exists()
-            || self.languages.iter().any(|lang| lang == "rust")
+            || self
+                .languages
+                .iter()
+                .any(|lang| lang.eq_ignore_ascii_case("rust"))
     }
 
     pub fn is_noarch(&self, workspace_path: &Path) -> bool {

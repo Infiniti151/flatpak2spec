@@ -6,6 +6,7 @@ use clap::Parser;
 use std::fs;
 use std::path::PathBuf;
 
+mod forge;
 mod manifest;
 mod meson;
 mod repository;
@@ -108,15 +109,31 @@ fn run() -> Result<()> {
 
     if cli.verbose > 0 {
         print_info("\n--- Extracted Metadata ---");
-        print_info(&format!("  App ID:      {:?}", manifest.id));
-        print_info(&format!("  Meson Name:  {:?}", meson_proj.name));
-        print_info(&format!("  License:     {:?}", meson_proj.license));
+        print_info(&format!("  App ID:          {:?}", manifest.id));
+        print_info(&format!("  Command:         {:?}", manifest.command));
+        print_info(&format!("  Runtime:         {:?}", manifest.runtime));
         print_info(&format!(
-            "  Is Noarch:   {}",
+            "  Runtime Version: {:?}",
+            manifest.runtime_version
+        ));
+        print_info(&format!("  SDK:             {:?}", manifest.sdk));
+        print_info(&format!("  Meson Name:      {:?}", meson_proj.name));
+        print_info(&format!("  License:         {:?}", meson_proj.license));
+        print_info(&format!(
+            "  Is Noarch:       {}",
             meson_proj.is_noarch(&workspace)
         ));
-        print_info(&format!("  Packager:    {} <{}>", packager, email));
     }
+
+    // 4. Resolve Upstream App / Package Name
+    let app_name = meson_proj.name.clone().unwrap_or_else(|| {
+        manifest
+            .get_app_id()
+            .as_deref()
+            .and_then(|id| id.split('.').last())
+            .unwrap_or("app")
+            .to_string()
+    });
 
     // 4. Generate Complete Spec Content
     print_info("\nGenerating RPM spec file...");
@@ -128,16 +145,6 @@ fn run() -> Result<()> {
         cli.bug_url.as_deref(),
     );
 
-    // App name fallback for file naming
-    let app_name = meson_proj.name.clone().unwrap_or_else(|| {
-        manifest
-            .get_app_id()
-            .as_deref()
-            .and_then(|id| id.split('.').last())
-            .unwrap_or("app")
-            .to_string()
-    });
-
     // 5. Output Handling (Write to file or stdout)
     if let Some(out_path) = resolve_output_path(cli.output, &app_name) {
         fs::write(&out_path, &spec_content)?;
@@ -146,7 +153,7 @@ fn run() -> Result<()> {
             out_path.display()
         ));
     } else {
-        print_success("\n================ GENERATED SPEC ================");
+        print_success("\n================= GENERATED SPEC =================");
         print_success(&spec_content);
         print_success("=======================================================");
     }

@@ -11,24 +11,27 @@ impl BuildSection {
     pub fn generate(meson: &MesonProject, workspace_path: &Path) -> String {
         let mut section = String::new();
 
-        // 1. %prep
+        // %prep
         section.push_str("%prep\n");
-        section.push_str("%setup -q -n %{name}\n\n");
+        section.push_str("%autosetup -C -p1\n\n");
 
-        // 2. %build
+        // %build
         section.push_str("%build\n");
         section.push_str("%meson\n");
         section.push_str("%meson_build\n\n");
 
-        // 3. %install
+        // %install
         section.push_str("%install\n");
         section.push_str("%meson_install\n");
         if meson.has_po_subdir() {
             section.push_str("%find_lang %{name}\n");
         }
+        if meson.has_python {
+            section.push_str("%py3_shebang_fix %{buildroot}%{_bindir}/%{name} %{buildroot}%{_datadir}/%{name}/\n");
+        }
         section.push('\n');
 
-        // 4. %check
+        // %check
         section.push_str("%check\n");
         section.push_str("%meson_test\n");
 

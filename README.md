@@ -43,13 +43,14 @@ Options:
 
 ## Generated Spec File
 
-Command: 
+Command:
 
-`flatpak2spec -r https://codeberg.org/ckruse/Gitte -v -b https://github.c
-om/Infiniti151/flatpak-apps`
+`flatpak2spec -r https://codeberg.org/ckruse/Gitte -b https://github.com/Infiniti151/flatpak-apps`
 
 Output:
 ```
+%global         app_id de.wwwtech.gitte
+
 Name:           gitte
 Version:        0.9.1
 Release:        1%{?dist}
@@ -77,7 +78,7 @@ Gitte is built around putting commits together with care. Stage or discard your 
 Beyond that, follow how your project's history branches and merges in a visual graph, organize branches and tags, set work aside for later, and sync with the places your code is stored, all in a clean, native interface.
 
 %prep
-%setup -q -n %{name}
+%autosetup -C -p1
 
 %build
 %meson
@@ -92,43 +93,33 @@ Beyond that, follow how your project's history branches and merges in a visual g
 desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/*.metainfo.xml
 glib-compile-schemas --dry-run --strict %{buildroot}%{_datadir}/glib-2.0/schemas/
-
-%post
-%{_bindir}/update-desktop-database &> /dev/null || :
-%{_bindir}/gtk-update-icon-cache -f -t %{_datadir}/icons/hicolor &> /dev/null || :
-
-%postun
-%{_bindir}/update-desktop-database &> /dev/null || :
-%{_bindir}/gtk-update-icon-cache -f -t %{_datadir}/icons/hicolor &> /dev/null || :
-
-%posttrans
-%{_bindir}/glib-compile-schemas %{_datadir}/glib-2.0/schemas &> /dev/null || :
 ```
 
 ## Project Structure
 
 ```
 flatpak2spec/
-├── Cargo.toml                      # Project metadata and crate dependencies
+├── Cargo.toml                      # Project metadata, binary definition, and crate dependencies
 ├── .github/
 │   └── workflows/
 │       └── release.yml             # CI/CD workflow for automated building, attestation, and releases
 └── src/
     ├── main.rs                     # Entry point: orchestrates CLI args, workspace cloning, and pipeline execution
-    ├── spec.rs                     # Final spec file generator
-    ├── resolver.rs                 # Workspace preparation and remote Git repository cloning logic
+    ├── spec.rs                     # Assembles all generated section strings into a final RPM .spec file
+    ├── repository.rs               # Workspace preparation and remote Git repository cloning logic
+    ├── forge.rs                    # Detects Git hosts (GitHub, GitLab, Codeberg) to format Source0 URLs & %autosetup flags
     ├── manifest.rs                 # Flatpak manifest parser and validation engine
     ├── meson.rs                    # Meson build file inspection and metadata extraction
-    ├── utils.rs                    # Common utilities
+    ├── utils.rs                    # Common filesystem, regex search, and string helper utilities
     └── sections/                   # Spec file section generators
-        ├── mod.rs                  # [Implemented] Module aggregator for spec sections
-        ├── header.rs               # [Implemented] Generates RPM metadata header
-        ├── deps.rs                 # [Implemented] Translates Flatpak modules/dependencies into BuildRequires and Requires
-        ├── description.rs          # [Implemented] Generates %description
-        ├── build.rs                # [Implemented] Generates build section
-        ├── scriptlets.rs           # [Implemented] Generates scriptlets
-        ├── files.rs                # [Planned] Generates %files filelist manifest
-        └── changelog.rs            # [Planned] Generates %changelog
+        ├── mod.rs                  # Module aggregator exporting all spec section submodules
+        ├── header.rs               # Generates RPM spec preamble metadata (Name, Version, License, URL, Source0)
+        ├── deps.rs                 # Translates Flatpak modules/dependencies into BuildRequires and Requires directives
+        ├── description.rs          # Generates the %description section
+        ├── build.rs                # Generates %prep, %build, %install, and %check sections
+        ├── scriptlets.rs           # Generates post/un scriptlets (icon cache updates, glib schemas)
+        ├── files.rs                # Scans project artifacts to generate %files listings and %find_lang macros
+        └── changelog.rs            # Generates the %changelog section
 ```
 
 ## Contributing
