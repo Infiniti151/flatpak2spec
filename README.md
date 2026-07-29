@@ -1,17 +1,18 @@
 # flatpak2spec
 
-`flatpak2spec` is a fast, robust Rust-based CLI tool designed to inspect a Flatpak application repository (or remote URL) and automatically generate a complete, production-ready RPM `.spec` file.
+`flatpak2spec` is a fast, robust Rust CLI tool designed to inspect Flatpak application repositories (or remote URLs) and automatically generate production-ready, Fedora-compliant RPM .spec files following official Fedora Packaging Guidelines.
 
 > [!WARNING]
-> **Prerelease Notice:** `flatpak2spec` is currently under development and is in a prerelease state. It **does not yet generate complete RPM spec files**—Files and changelog generation is coming soon! Supported only for `meson` buildsystem for now.
+> **Prerelease Notice:** `flatpak2spec` is currently under active development and in a prerelease state. It **does not yet generate complete RPM spec files** (`%files` and `%changelog` sections are coming soon!). Currently supports projects using the **Meson** build system.
 
 ## Features
 
-- 🚀 **Remote & Local Repositories:** Supports direct cloning and workspace parsing from GitHub, GitLab, Codeberg, or local directories.
-- 📦 **Manifest & Build Parsing:** Inspects Flatpak JSON/YAML manifests and Meson project configurations (`meson.build`).
-- 🏷️ **Smart Version & Prefix Detection:** Queries remote tags to determine the latest semantic release version and dynamically handles tag prefixes for correct `Source0` URL generation.
-- 🏗️ **Platform-Specific Archives:** Automatically formats archive download links for GitHub, GitLab, and Codeberg/Gitea.
-- 🎯 **Noarch Detection:** Automatically detects header parameters like `BuildArch: noarch` when applicable.
+- 🚀 **Remote & Local Repositories:** Supports direct cloning and workspace parsing from GitHub, GitLab, Codeberg, or local filesystem directories.
+- 📦 **Manifest & Metadata Parsing:** Inspects Flatpak JSON/YAML manifests, AppStream metadata (`.metainfo.xml`), and Meson project configurations (`meson.build`).
+- 🏷️ **Smart Version & Forge Detection:** Queries remote forge tags to determine the latest semantic release version, handles URL prefixes (`v1.0` vs `1.0`), and formats accurate `Source0` download links.
+- 🛠️ **Fedora-Compliant Output:** Generates clean RPM spec files adhering to modern Fedora packaging standards, including standard macros (`%meson`, `%meson_build`, `%find_lang`) and `%check` validation steps (`desktop-file-validate`, `appstream-util`).
+- ⚡ **Copr & CI-Ready:** Optimized out-of-the-box for online build environments such as Fedora Copr, GitHub Actions, and local `mock` chroots.
+- 🎯 **Noarch Detection:** Automatically detects asset-only or script projects to emit `BuildArch: noarch` when appropriate.
 
 ## Installation
 
@@ -107,7 +108,7 @@ flatpak2spec/
     ├── main.rs                     # Entry point: orchestrates CLI args, workspace cloning, and pipeline execution
     ├── spec.rs                     # Assembles all generated section strings into a final RPM .spec file
     ├── repository.rs               # Workspace preparation and remote Git repository cloning logic
-    ├── forge.rs                    # Detects Git hosts (GitHub, GitLab, Codeberg) to format Source0 URLs & %autosetup flags
+    ├── forge.rs                    # Detects Git hosts (GitHub, GitLab, Codeberg) to format Source URLs
     ├── manifest.rs                 # Flatpak manifest parser and validation engine
     ├── meson.rs                    # Meson build file inspection and metadata extraction
     ├── utils.rs                    # Common filesystem, regex search, and string helper utilities
