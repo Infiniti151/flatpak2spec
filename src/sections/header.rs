@@ -62,7 +62,7 @@ impl HeaderSection {
 
         header.push_str(&format!("Source0:        {}", source0));
 
-        if meson.is_noarch(workspace_path) {
+        if meson.is_noarch() {
             header.push_str("\n\nBuildArch:      noarch\n\n");
         } else {
             header.push_str("\n\n");

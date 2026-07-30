@@ -73,6 +73,65 @@ pub fn find_matching_files(dir: &Path, patterns: &[&str]) -> Vec<PathBuf> {
     matches
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct SystemdUnits {
+    pub has_user: bool,
+    pub has_system: bool,
+    pub unit_names: Vec<String>,
+}
+
+/// Detects real systemd unit files in the workspace (ignoring D-Bus service files),
+/// and extracts both their scope (User/System) and their clean filenames.
+pub fn detect_systemd_units(workspace: &Path) -> SystemdUnits {
+    let mut units = SystemdUnits::default();
+
+    // Base patterns (find_matching_files uses `.contains()`, so this covers `.in` variants too)
+    let unit_patterns = [".service", ".socket", ".timer", ".path", ".target"];
+    let matching_paths = find_matching_files(workspace, &unit_patterns);
+
+    for path in matching_paths {
+        let path_str = path.to_string_lossy().to_lowercase();
+
+        // 1. Ignore D-Bus service activation directories
+        if path_str.contains("dbus-1") || path_str.contains("dbus-services") {
+            continue;
+        }
+
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            // 2. Ignore D-Bus service activation files by content
+            if content.contains("[D-BUS Service]") {
+                continue;
+            }
+
+            // 3. Determine scope
+            if path_str.contains("/user/") || path_str.contains("user-") {
+                units.has_user = true;
+            } else if path_str.contains("/system/")
+                || content.contains("WantedBy=multi-user.target")
+                || content.contains("User=root")
+            {
+                units.has_system = true;
+            } else {
+                units.has_user = true; // Default fallback
+            }
+        } else {
+            // Fallback if file read fails but it matched the extension
+            units.has_user = true;
+        }
+
+        // 4. Extract clean unit file name (e.g., "my-daemon.service")
+        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+            let clean_name = file_name.strip_suffix(".in").unwrap_or(file_name);
+            if !units.unit_names.contains(&clean_name.to_string()) {
+                units.unit_names.push(clean_name.to_string());
+            }
+        }
+    }
+
+    units.unit_names.sort();
+    units
+}
+
 pub fn print_info(message: &str) {
     println!("{}", message.yellow());
 }

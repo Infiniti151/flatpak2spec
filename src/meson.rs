@@ -62,7 +62,17 @@ impl MesonProject {
             // Extract project name
             let name_re = Regex::new(r#"(?i)project\s*\(\s*['"]([^'"]+)['"]"#).unwrap();
             if let Some(caps) = name_re.captures(content) {
-                self.name = Some(caps[1].to_lowercase());
+                let raw_name = &caps[1];
+                let clean_name = if raw_name.contains('.') {
+                    raw_name
+                        .split('.')
+                        .last()
+                        .unwrap_or(raw_name)
+                        .to_lowercase()
+                } else {
+                    raw_name.to_lowercase()
+                };
+                self.name = Some(clean_name);
             }
 
             // Extract minimum meson version
@@ -215,11 +225,7 @@ impl MesonProject {
                 .any(|lang| lang.eq_ignore_ascii_case("rust"))
     }
 
-    pub fn is_noarch(&self, workspace_path: &Path) -> bool {
-        if self.is_rust_project(workspace_path) {
-            return false;
-        }
-
+    pub fn is_noarch(&self) -> bool {
         let compiled_languages = [
             "c", "cpp", "cuda", "cython", "d", "objc", "objcpp", "fortran", "cs", "swift", "vala",
             "rust", "nasm", "masm",

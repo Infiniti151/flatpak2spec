@@ -119,10 +119,7 @@ fn run() -> Result<()> {
         print_info(&format!("  SDK:             {:?}", manifest.sdk));
         print_info(&format!("  Meson Name:      {:?}", meson_proj.name));
         print_info(&format!("  License:         {:?}", meson_proj.license));
-        print_info(&format!(
-            "  Is Noarch:       {}",
-            meson_proj.is_noarch(&workspace)
-        ));
+        print_info(&format!("  Is Noarch:       {}", meson_proj.is_noarch()));
     }
 
     // 4. Resolve Upstream App / Package Name

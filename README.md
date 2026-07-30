@@ -3,9 +3,9 @@
 `flatpak2spec` is a fast, robust Rust CLI tool designed to inspect Flatpak application repositories (or remote URLs) and automatically generate production-ready, Fedora-compliant RPM .spec files following official Fedora Packaging Guidelines.
 
 > [!WARNING]
-> **Prerelease Notice:** `flatpak2spec` is currently under active development and in a prerelease state. It **does not yet generate complete RPM spec files** (`%files` and `%changelog` sections are coming soon!). Currently supports projects using the **Meson** build system.
+> **Prerelease Notice:** `flatpak2spec` is currently under active development and in a prerelease state. It **does not yet generate complete RPM spec files** (`%changelog` section is coming soon!). Currently supports projects using the **Meson** build system.
 
-## Features
+## ✨ Features
 
 - 🚀 **Remote & Local Repositories:** Supports direct cloning and workspace parsing from GitHub, GitLab, Codeberg, or local filesystem directories.
 - 📦 **Manifest & Metadata Parsing:** Inspects Flatpak JSON/YAML manifests, AppStream metadata (`.metainfo.xml`), and Meson project configurations (`meson.build`).
@@ -14,7 +14,7 @@
 - ⚡ **Copr & CI-Ready:** Optimized out-of-the-box for online build environments such as Fedora Copr, GitHub Actions, and local `mock` chroots.
 - 🎯 **Noarch Detection:** Automatically detects asset-only or script projects to emit `BuildArch: noarch` when appropriate.
 
-## Installation
+## 📥 Installation
 
 Ensure you have Rust and Cargo installed, then build from source:
 
@@ -26,7 +26,7 @@ cargo build --release
 
 The compiled binary will be available at `target/release/flatpak2spec`.
 
-## Usage
+## 💻 Usage
 
 ```
 flatpak2spec [OPTIONS] --repo <PATH_OR_URL>
@@ -42,11 +42,13 @@ Options:
   -V, --version              Print version
   ```
 
-## Generated Spec File
+## 📄 Generated Spec File
 
 Command:
 
-`flatpak2spec -r https://codeberg.org/ckruse/Gitte -b https://github.com/Infiniti151/flatpak-apps`
+```
+flatpak2spec -r https://codeberg.org/ckruse/Gitte -b https://github.com/Infiniti151/flatpak-apps
+```
 
 Output:
 ```
@@ -94,9 +96,20 @@ Beyond that, follow how your project's history branches and merges in a visual g
 desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/*.metainfo.xml
 glib-compile-schemas --dry-run --strict %{buildroot}%{_datadir}/glib-2.0/schemas/
+
+%files -f %{name}.lang
+%license COPYING
+%doc README.md
+%{_bindir}/%{name}
+%{_datadir}/%{name}
+%{_datadir}/applications/%{app_id}.desktop
+%{_datadir}/icons/hicolor/*/apps/%{app_id}*
+%{_datadir}/glib-2.0/schemas/*.gschema.xml
+%{_datadir}/dbus-1/services/*.service
+%{_metainfodir}/%{app_id}.metainfo.xml
 ```
 
-## Project Structure
+## 📂 Project Structure
 
 ```
 flatpak2spec/
@@ -123,10 +136,10 @@ flatpak2spec/
         └── changelog.rs            # Generates the %changelog section
 ```
 
-## Contributing
+## 🤝 Contributing
 
 Contributions, bug reports, and pull requests are welcome! Feel free to check out the issues page.
 
-## License
+## 📜 License
 
 This project is licensed under GPL-3.0-or-later.

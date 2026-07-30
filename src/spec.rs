@@ -6,6 +6,7 @@ use crate::meson::MesonProject;
 use crate::sections::build::BuildSection;
 use crate::sections::deps::DepsSection;
 use crate::sections::description::DescriptionSection;
+use crate::sections::files::{FilesContext, generate_files_section};
 use crate::sections::header::HeaderSection;
 use crate::sections::scriptlets::ScriptletsSection;
 use std::path::Path;
@@ -56,6 +57,11 @@ impl SpecGenerator {
                 spec.push('\n');
             }
         }
+
+        // 6. %files section
+        let files_ctx = FilesContext::inspect(workspace_path, Some(manifest), Some(meson));
+        let files = generate_files_section(&files_ctx);
+        spec.push_str(&files);
 
         spec
     }
