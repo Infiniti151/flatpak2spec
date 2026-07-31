@@ -8,11 +8,14 @@ License:        GPL-3.0-or-later
 URL:            https://github.com/Infiniti151/%{name}
 BugURL:         https://github.com/Infiniti151/%{name}/issues
 
-%ifarch x86_64
 Source0: %{url}/releases/download/v%{version}/%{name}-%{version}-x86_64.tar.gz
+Source1: %{url}/releases/download/v%{version}/%{name}-%{version}-aarch64.tar.gz
+
+%ifarch x86_64
+%global binary_source 0
 %endif
 %ifarch aarch64
-Source0: %{url}/releases/download/v%{version}/%{name}-%{version}-aarch64.tar.gz
+%global binary_source 1
 %endif
 
 ExclusiveArch:  x86_64 aarch64
@@ -41,7 +44,7 @@ and Fedora-compliant RPM spec files.
   emit BuildArch: noarch when appropriate.
 
 %prep
-%autosetup -C -p1
+%autosetup -C -p1 -T -a %{binary_source}
 
 %build
 # Pre-compiled binary release; no compilation required in build stage.
