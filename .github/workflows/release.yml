@@ -130,12 +130,12 @@ jobs:
         run: |
           VERSION="${{ needs.verify-and-build.outputs.release_number }}"
 
-          awk '/^## \[/ { if (count++) exit } count { print }' CHANGELOG.md > release_notes.md
+          awk '/^## \[/ { if (count++) exit } count { print }' CHANGELOG.md | grep -v '^#' > release_notes.md
 
           DATE_STR=$(date "+%a %b %d %Y")
-          CHLOG_HDR="* $DATE_STR Infiniti151 <packager@localhost> - ${VERSION}-1"
+          CHLOG_HDR="* $DATE_STR Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - ${VERSION}-1"
 
-          CLEAN_BODY=$(sed 's/^- /- /' release_notes.md)
+          CLEAN_BODY=$(sed '/^$/d' release_notes.md)
 
           sed -i "s/^Version:[[:space:]]*.*/Version:        ${VERSION}/" flatpak2spec.spec
 
