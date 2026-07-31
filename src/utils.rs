@@ -2,10 +2,13 @@
 // Copyright (C) 2026 Infiniti151
 
 use colored::Colorize;
+use roxmltree::Node;
 use std::path::{Path, PathBuf};
 
+use crate::manifest::FlatpakManifest;
+
 /// Recursively searches a directory for files matching a specific extension or name snippet,
-/// including `.in` template files (e.g. `.desktop.in`).
+/// ignoring subprojects, build directories, and hidden files.
 pub fn check_file_extension(dir: &Path, ext: &str) -> bool {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
@@ -16,8 +19,13 @@ pub fn check_file_extension(dir: &Path, ext: &str) -> bool {
         let path = entry.path();
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
-        // Skip hidden dotfiles/directories (.git, .build, etc.)
-        if name.starts_with('.') {
+        // Skip hidden dotfiles/directories (.git, .build, etc.), subprojects, and vendor dirs
+        if name.starts_with('.')
+            || name == "subprojects"
+            || name == "build"
+            || name == "_build"
+            || name == "vendor"
+        {
             continue;
         }
 
@@ -40,12 +48,39 @@ pub fn has_desktop_file(dir: &Path) -> bool {
     check_file_extension(dir, ".desktop")
 }
 
-/// Checks if the workspace contains AppStream/MetaInfo XML files or templates.
-pub fn has_metainfo_file(dir: &Path) -> bool {
-    check_file_extension(dir, "metainfo.xml") || check_file_extension(dir, "appdata.xml")
+/// Finds and returns the primary AppStream/MetaInfo XML file path within the workspace.
+///
+/// Automatically attempts to resolve `manifest.id` from the workspace to match
+/// exact filenames like `{id}.metainfo.xml` or `{id}.appdata.xml`.
+pub fn find_metainfo_file(dir: &Path) -> Option<PathBuf> {
+    // Attempt to parse manifest and extract ID internally
+    let app_id = FlatpakManifest::load_from_workspace(dir)
+        .ok()
+        .and_then(|m| m.id);
+
+    if let Some(id) = app_id {
+        let metainfo_pattern = format!("{}.metainfo.xml", id);
+        let appdata_pattern = format!("{}.appdata.xml", id);
+
+        let matches = find_matching_files(dir, &[&metainfo_pattern, &appdata_pattern]);
+        if let Some(path) = matches.into_iter().next() {
+            return Some(path);
+        }
+    }
+
+    // Generic fallback if no ID was found or no exact match was matched
+    find_matching_files(dir, &["metainfo.xml", "appdata.xml"])
+        .into_iter()
+        .next()
 }
 
-/// Recursively finds all file paths matching a given set of pattern strings (e.g., [".desktop", "metainfo.xml"]).
+/// Convenience check returning bool.
+pub fn has_metainfo_file(dir: &Path) -> bool {
+    find_metainfo_file(dir).is_some()
+}
+
+/// Recursively finds all file paths matching a given set of pattern strings,
+/// ignoring hidden folders, Meson subprojects, build outputs, and vendor trees.
 pub fn find_matching_files(dir: &Path, patterns: &[&str]) -> Vec<PathBuf> {
     let mut matches = Vec::new();
     let entries = match std::fs::read_dir(dir) {
@@ -57,7 +92,13 @@ pub fn find_matching_files(dir: &Path, patterns: &[&str]) -> Vec<PathBuf> {
         let path = entry.path();
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
-        if name.starts_with('.') {
+        // Skip hidden folders, Meson subprojects, build outputs, and vendor trees
+        if name.starts_with('.')
+            || name == "subprojects"
+            || name == "build"
+            || name == "_build"
+            || name == "vendor"
+        {
             continue;
         }
 
@@ -65,7 +106,10 @@ pub fn find_matching_files(dir: &Path, patterns: &[&str]) -> Vec<PathBuf> {
             matches.extend(find_matching_files(&path, patterns));
         } else {
             let lower = name.to_lowercase();
-            if patterns.iter().any(|pat| lower.contains(pat)) {
+            if patterns
+                .iter()
+                .any(|pat| lower.contains(&pat.to_lowercase()))
+            {
                 matches.push(path);
             }
         }
@@ -130,6 +174,84 @@ pub fn detect_systemd_units(workspace: &Path) -> SystemdUnits {
 
     units.unit_names.sort();
     units
+}
+
+/// Formats an AppStream XML node containing `<p>`, `<ul>`, `<ol>`, and `<li>` elements
+/// into clean, plain text suitable for RPM %description or release notes.
+pub fn format_appstream_node(node: Node) -> String {
+    let mut elements = Vec::new();
+
+    for child in node
+        .descendants()
+        .filter(|n| n.is_element() && n.id() != node.id())
+    {
+        // Skip <li> elements that are inside a list (since ul/ol handles them)
+        if child.tag_name().name() == "li"
+            && child
+                .ancestors()
+                .any(|a| a.tag_name().name() == "ul" || a.tag_name().name() == "ol")
+        {
+            continue;
+        }
+
+        match child.tag_name().name() {
+            "p" => {
+                let text = collect_node_text(child);
+                if !text.is_empty() {
+                    elements.push((false, text));
+                }
+            }
+            "ul" | "ol" => {
+                let mut items = Vec::new();
+                for li in child
+                    .children()
+                    .filter(|n| n.is_element() && n.tag_name().name() == "li")
+                {
+                    let text = collect_node_text(li);
+                    if !text.is_empty() {
+                        items.push(format!("- {}", text)); // Re-add bullet prefix for lists
+                    }
+                }
+                if !items.is_empty() {
+                    elements.push((true, items.join("\n")));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Assemble with context-aware line spacing
+    let mut result_parts = Vec::new();
+    for (idx, (is_list, content)) in elements.iter().enumerate() {
+        result_parts.push(content.as_str());
+
+        if idx + 1 < elements.len() {
+            let (next_is_list, _) = &elements[idx + 1];
+            if !is_list && *next_is_list {
+                result_parts.push("\n");
+            } else {
+                result_parts.push("\n\n");
+            }
+        }
+    }
+
+    result_parts.concat()
+}
+
+/// Recursively collects and normalizes all inner text within an XML node,
+/// stripping inner XML/HTML tags (e.g. `<em>`, `<code>`, `<a>`).
+pub fn collect_node_text(node: Node) -> String {
+    let mut text_parts = Vec::new();
+    for desc in node.descendants() {
+        if desc.is_text() {
+            if let Some(txt) = desc.text() {
+                text_parts.push(txt);
+            }
+        }
+    }
+    let combined = text_parts.join("");
+    // Replace contiguous whitespace/newlines with a single space
+    combined.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 pub fn print_info(message: &str) {

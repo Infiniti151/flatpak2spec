@@ -116,15 +116,24 @@ impl MesonProject {
             }
         }
 
-        // Check for Python / PyGObject
-        if content.contains("import('python')")
-            || content.contains("find_installation")
-            || content.contains("python3")
-        {
+        // Check for Python / PyGObject in Meson AST / content
+        let has_python_import =
+            content.contains("import('python')") || content.contains("import('python3')");
+
+        let has_python_dep =
+            content.contains("dependency('python") || content.contains("dependency('python3");
+
+        let has_python_inst = content.contains("python.find_installation")
+            || content.contains("find_program('python3')");
+
+        if has_python_import || has_python_dep || has_python_inst {
             self.has_python = true;
         }
 
-        if content.contains("pygobject") || content.contains("gi.repository") {
+        if content.contains("dependency('pygobject")
+            || content.contains("find_program('pygobject")
+            || content.contains("gi.repository")
+        {
             self.has_python = true;
             self.has_pygobject = true;
         }

@@ -5,6 +5,13 @@ edition = "2024"
 authors = ["Infiniti151"]
 license = "GPL-3.0-or-later"
 
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -14,3 +21,4 @@ chrono = "0.4"
 anyhow = "1.0"
 regex = "1"
 colored = "3.1.1"
+roxmltree = "0.21.1"

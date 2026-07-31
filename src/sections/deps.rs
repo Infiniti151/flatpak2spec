@@ -22,13 +22,15 @@ impl DepsSection {
         build_requires.insert("ninja-build".to_string());
 
         // 2. Python detection
-        let contains_python_files = Self::has_python_files(workspace_path);
+        // Only trigger Python dependencies if Meson explicitely declares Python
+        // OR if Python source files exist inside the app's `src/` directory.
+        let is_python_app = meson.has_python || Self::has_python_app_code(workspace_path);
 
-        if meson.has_python || contains_python_files {
+        if is_python_app {
             build_requires.insert("python3-devel".to_string());
             requires.insert("python3".to_string());
 
-            if meson.has_pygobject || meson.modules.has_gnome || contains_python_files {
+            if meson.has_pygobject || meson.modules.has_gnome {
                 requires.insert("python3-gobject".to_string());
             }
         }
@@ -119,8 +121,15 @@ impl DepsSection {
         output
     }
 
-    fn has_python_files(dir: &Path) -> bool {
-        check_file_extension(dir, ".py")
+    /// Checks if application source code (specifically inside `src/`) uses Python.
+    /// Avoids matching standalone root scripts like `update-po.py` or `scripts/`.
+    fn has_python_app_code(workspace: &Path) -> bool {
+        let src_dir = workspace.join("src");
+        if src_dir.is_dir() {
+            check_file_extension(&src_dir, ".py")
+        } else {
+            false
+        }
     }
 
     fn has_blueprint_files(dir: &Path) -> bool {

@@ -53,23 +53,30 @@ pub struct Cli {
     pub verbose: u8,
 }
 
+impl Cli {
+    /// Resolves packager name with fallback
+    pub fn packager_name(&self) -> &str {
+        self.packager.as_deref().unwrap_or("Packager")
+    }
+
+    /// Resolves packager email with fallback
+    pub fn packager_email(&self) -> &str {
+        self.email.as_deref().unwrap_or("packager@localhost")
+    }
+}
+
 /// Resolves the output path:
-/// - If None: returns None (indicating output should go to stdout).
+/// - If None: returns None (stdout).
 /// - If Directory: appends `<default_name>.spec`.
-/// - If File Path: ensures extension is `.spec` (appends `.spec` if missing or incorrect).
+/// - If File Path: ensures extension is `.spec`.
 pub fn resolve_output_path(output_arg: Option<PathBuf>, default_name: &str) -> Option<PathBuf> {
     output_arg.map(|path| {
         if path.is_dir() {
-            path.join(format!("{}.spec", default_name))
+            path.join(format!("{default_name}.spec"))
         } else {
-            match path.extension() {
-                Some(ext) if ext == "spec" => path,
-                _ => {
-                    let mut path_str = path.to_string_lossy().to_string();
-                    path_str.push_str(".spec");
-                    PathBuf::from(path_str)
-                }
-            }
+            let mut p = path;
+            p.set_extension("spec");
+            p
         }
     })
 }
@@ -84,13 +91,10 @@ fn main() {
 fn run() -> Result<()> {
     let cli = Cli::parse();
 
-    let packager = cli.packager.as_deref().unwrap_or("Packager");
-    let email = cli.email.as_deref().unwrap_or("packager@localhost");
-
     if cli.verbose > 0 {
         print_info(&format!("Verbosity level: {}", cli.verbose));
         if let Some(ref url) = cli.bug_url {
-            println!("Bug URL:     {}", url);
+            println!("Bug URL:     {url}");
         }
     }
 
@@ -99,11 +103,10 @@ fn run() -> Result<()> {
     let workspace = RepoResolver::prepare_workspace(&cli.repo)?;
     print_info(&format!("Workspace ready at: {}", workspace.display()));
 
-    // 2. Load Manifest
+    // 2. Load Manifest & Meson Metadata
     print_info("Loading and validating Flatpak manifest...");
     let manifest = FlatpakManifest::load_from_workspace(&workspace)?;
 
-    // 3. Parse Meson Project Metadata
     print_info("Parsing Meson build configuration...");
     let meson_proj = MesonProject::parse_from_workspace(&workspace)?;
 
@@ -122,25 +125,19 @@ fn run() -> Result<()> {
         print_info(&format!("  Is Noarch:       {}", meson_proj.is_noarch()));
     }
 
-    // 4. Resolve Upstream App / Package Name
+    // 3. Resolve Upstream App / Package Name
     let app_name = meson_proj.name.clone().unwrap_or_else(|| {
         manifest
             .get_app_id()
             .as_deref()
-            .and_then(|id| id.split('.').last())
+            .and_then(|id| id.rsplit('.').next())
             .unwrap_or("app")
             .to_string()
     });
 
     // 4. Generate Complete Spec Content
     print_info("\nGenerating RPM spec file...");
-    let spec_content = SpecGenerator::generate(
-        &manifest,
-        &meson_proj,
-        &workspace,
-        &cli.repo,
-        cli.bug_url.as_deref(),
-    );
+    let spec_content = SpecGenerator::generate(&manifest, &meson_proj, &workspace, &cli);
 
     // 5. Output Handling (Write to file or stdout)
     if let Some(out_path) = resolve_output_path(cli.output, &app_name) {
