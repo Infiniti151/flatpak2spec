@@ -158,6 +158,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
+          branch: main
           commit_message: "🤖 chore(release): update spec file for ${{ needs.verify-and-build.outputs.tag }}"
           files: flatpak2spec.spec
           fail_on_self_push: false
