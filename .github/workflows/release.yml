@@ -6,6 +6,10 @@ on:
     tags:
       - "v*"
 
+env:
+  BIN_NAME: ${{ github.event.repository.name }}
+  SPEC_FILE: ${{ github.event.repository.name }}.spec
+
 jobs:
   verify-and-build:
     name: Build (${{ matrix.target }})
@@ -47,7 +51,6 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "release_number=$VERSION" >> $GITHUB_OUTPUT
 
-          # Set step environment variables for this job
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "ARCH=${{ matrix.arch }}" >> $GITHUB_ENV
@@ -95,19 +98,15 @@ jobs:
 
       - name: Package Tarball
         run: |
-          TAR_NAME="flatpak2spec-${VERSION}-${ARCH}.tar.gz"
-          BIN_NAME="flatpak2spec-${VERSION}"
-
-          # Create tarball containing the compiled binary, LICENSE, and README.md
-          tar -czvf "$GITHUB_WORKSPACE/$TAR_NAME" \
-            -C "target/${{ matrix.target }}/release" "$BIN_NAME" \
-            LICENSE README.md
+          TAR_NAME="${BIN_NAME}-${VERSION}-${ARCH}.tar.gz"
+          cp "target/${{ matrix.target }}/release/${BIN_NAME}" "./${BIN_NAME}"
+          tar -czvf "$GITHUB_WORKSPACE/$TAR_NAME" "$BIN_NAME" LICENSE README.md
 
       - name: Upload Artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: archive-${{ matrix.arch }}
-          path: "flatpak2spec-${{ steps.set_version.outputs.release_number }}-${{ matrix.arch }}.tar.gz"
+          path: "${{ env.BIN_NAME }}-${{ steps.set_version.outputs.release_number }}-${{ matrix.arch }}.tar.gz"
 
   publish-release:
     name: Create Release & Sync Spec
@@ -120,7 +119,10 @@ jobs:
       artifact-metadata: write
       actions: read
     outputs:
-      release_number: ${{ needs.verify-and-build.outputs.release_number }}
+      release_number: ${{ env.VERSION }}
+    env:
+      VERSION: ${{ needs.verify-and-build.outputs.release_number }}
+      TAG: ${{ needs.verify-and-build.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.1
@@ -129,8 +131,6 @@ jobs:
 
       - name: Parse Changelog & Update Spec
         run: |
-          VERSION="${{ needs.verify-and-build.outputs.release_number }}"
-
           awk '/^## \[/ { if (count++) exit } count { print }' CHANGELOG.md | grep -v '^#' > release_notes.md
 
           DATE_STR=$(date "+%a %b %d %Y")
@@ -138,7 +138,7 @@ jobs:
 
           CLEAN_BODY=$(sed '/^$/d' release_notes.md)
 
-          sed -i "s/^Version:[[:space:]]*.*/Version:        ${VERSION}/" flatpak2spec.spec
+          sed -i "s/^Version:[[:space:]]*.*/Version:        ${VERSION}/" "$SPEC_FILE"
 
           cat <<EOF > changelog.tmp
           $CHLOG_HDR
@@ -146,7 +146,7 @@ jobs:
 
           EOF
 
-          sed -i '/%changelog/r changelog.tmp' flatpak2spec.spec
+          sed -i '/%changelog/r changelog.tmp' "$SPEC_FILE"
           rm -f changelog.tmp
 
       - name: Commit Spec Updates via Suzuki Commit Action
@@ -155,12 +155,12 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           branch: main
-          commit_message: "🤖 chore(release): update spec file for ${{ needs.verify-and-build.outputs.tag }}"
-          files: flatpak2spec.spec
+          commit_message: "🤖 chore(release): update spec file for ${{ env.TAG }}"
+          files: ${{ env.SPEC_FILE }}
           fail_on_self_push: false
 
       - name: Download Artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c #8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: release-assets
           merge-multiple: true
@@ -173,8 +173,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
-          tag_name: ${{ needs.verify-and-build.outputs.tag }}
-          name: ${{ needs.verify-and-build.outputs.tag }}
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.TAG }}
           files: release-assets/*.tar.gz
           body_path: release_notes.md
 
@@ -197,7 +197,7 @@ jobs:
           echo "Triggering COPR build for release v${RELEASE_NUMBER}..."
 
           BASE_URL=$(echo "$COPR_WEBHOOK_URL" | xargs)
-          FINAL_URL="${BASE_URL%/}/flatpak2spec/"
+          FINAL_URL="${BASE_URL%/}/${BIN_NAME}/"
           MAX_RETRIES=3
           DELAY=5
           SUCCESS=false
