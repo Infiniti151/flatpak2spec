@@ -53,7 +53,7 @@ and Fedora-compliant RPM spec files.
 # Pre-compiled binary release; no compilation required in build stage.
 
 %install
-install -D -m 0755 %{name}-%{version} %{buildroot}%{_bindir}/%{name}
+install -D -m 0755 %{name} %{buildroot}%{_bindir}/%{name}
 
 %check
 %{buildroot}%{_bindir}/%{name} --help > /dev/null 2>&1
