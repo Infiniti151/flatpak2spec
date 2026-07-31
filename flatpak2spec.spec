@@ -29,6 +29,12 @@ and Fedora-compliant RPM spec files.
   metadata (.metainfo.xml), and Meson project configurations (meson.build).
 - Changelog & Release Notes Extraction: Automatically parses project changelogs
   and release notes to populate the RPM %changelog section cleanly.
+* Fri Jul 31 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 0.1.0-1
+- Initial release v0.1.0
+- Added remote and local repository parsing
+- Added manifest, AppStream, and changelog extraction
+- Added automatic architecture handling and noarch detection
+
 - Smart Version & Forge Detection: Queries remote forge tags to determine the
   latest semantic release version, handles URL prefixes (v1.0 vs 1.0), and
   formats accurate Source0 download links.
@@ -58,3 +64,9 @@ install -D -m 0755 %{name}-%{version} %{buildroot}%{_bindir}/%{name}
 %{_bindir}/%{name}
 
 %changelog
+* Fri Jul 31 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 0.1.0-1
+- Initial release v0.1.0
+- Added remote and local repository parsing
+- Added manifest, AppStream, and changelog extraction
+- Added automatic architecture handling and noarch detection
+
