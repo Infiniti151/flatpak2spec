@@ -11,6 +11,7 @@ jobs:
     name: Build (${{ matrix.target }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: true
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
@@ -105,11 +106,6 @@ jobs:
           cp flatpak2spec "$BIN_NAME"
           tar -czvf "$GITHUB_WORKSPACE/$TAR_NAME" "$BIN_NAME"
 
-      - name: Attest tarball archive
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
-        with:
-          subject-path: "flatpak2spec-${{ steps.set_version.outputs.release_number }}-${{ matrix.arch }}.tar.gz"
-
       - name: Upload Artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -168,6 +164,11 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
+
+      - name: Attest tarball archives
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: release-assets/*.tar.gz
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
