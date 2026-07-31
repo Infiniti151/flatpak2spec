@@ -8,12 +8,7 @@ License:        GPL-3.0-or-later
 URL:            https://github.com/Infiniti151/%{name}
 BugURL:         https://github.com/Infiniti151/%{name}/issues
 
-%ifarch x86_64
-Source0:        %{url}/releases/download/v%{version}/%{name}-%{version}-x86_64.tar.gz
-%endif
-%ifarch aarch64
-Source0:        %{url}/releases/download/v%{version}/%{name}-%{version}-aarch64.tar.gz
-%endif
+Source0:        %{url}/releases/download/v%{version}/%{name}-%{version}-%{_arch}.tar.gz
 
 ExclusiveArch:  x86_64 aarch64
 
@@ -29,12 +24,6 @@ and Fedora-compliant RPM spec files.
   metadata (.metainfo.xml), and Meson project configurations (meson.build).
 - Changelog & Release Notes Extraction: Automatically parses project changelogs
   and release notes to populate the RPM %changelog section cleanly.
-* Fri Jul 31 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 0.1.0-1
-- Initial release v0.1.0
-- Added remote and local repository parsing
-- Added manifest, AppStream, and changelog extraction
-- Added automatic architecture handling and noarch detection
-
 - Smart Version & Forge Detection: Queries remote forge tags to determine the
   latest semantic release version, handles URL prefixes (v1.0 vs 1.0), and
   formats accurate Source0 download links.
