@@ -38,10 +38,10 @@ and Fedora-compliant RPM spec files.
 
 %prep
 %ifarch x86_64
-%autosetup -C -p1 -T -a 0
+%autosetup -c -n %{name}-%{version} -T -a 0
 %endif
 %ifarch aarch64
-%autosetup -C -p1 -T -a 1
+%autosetup -c -n %{name}-%{version} -T -a 1
 %endif
 
 %build
