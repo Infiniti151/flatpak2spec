@@ -81,7 +81,7 @@ impl FlatpakManifest {
                         format!("Failed to parse JSON manifest: {}", manifest_path.display())
                     })?
                 } else {
-                    serde_yml::from_str(&content).with_context(|| {
+                    serde_norway::from_str(&content).with_context(|| {
                         format!("Failed to parse YAML manifest: {}", manifest_path.display())
                     })?
                 }
@@ -96,7 +96,7 @@ impl FlatpakManifest {
                 // If snapcraft.yaml exists, try extracting command/name from it
                 if let Ok(content) = fs::read_to_string(workspace_path.join("snap/snapcraft.yaml"))
                 {
-                    if let Ok(val) = serde_yml::from_str::<serde_json::Value>(&content) {
+                    if let Ok(val) = serde_norway::from_str::<serde_json::Value>(&content) {
                         if synthetic.command.is_none() {
                             synthetic.command =
                                 val.get("name").and_then(|v| v.as_str()).map(String::from);

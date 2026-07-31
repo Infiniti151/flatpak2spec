@@ -20,17 +20,11 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             arch: aarch64
             use_cross: true
-
     permissions:
-      id-token: write
       contents: write
-      attestations: write
-      artifact-metadata: write
-
     outputs:
       tag: ${{ steps.set_version.outputs.tag }}
       release_number: ${{ steps.set_version.outputs.release_number }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.1
@@ -119,7 +113,10 @@ jobs:
     needs: verify-and-build
     runs-on: ubuntu-latest
     permissions:
+      id-token: write
       contents: write
+      attestations: write
+      artifact-metadata: write
     outputs:
       release_number: ${{ needs.verify-and-build.outputs.release_number }}
     steps:
@@ -184,6 +181,7 @@ jobs:
     name: Trigger Copr Build via Webhook
     needs: [publish-release]
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
       - name: Trigger COPR Build via API
         env:
