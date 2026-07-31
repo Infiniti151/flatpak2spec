@@ -8,7 +8,7 @@ License:        GPL-3.0-or-later
 URL:            https://github.com/Infiniti151/%{name}
 BugURL:         https://github.com/Infiniti151/%{name}/issues
 
-Source0:        %{url}/releases/download/v%{version}/%{name}-%{version}-%{_arch}.tar.gz
+Source0:        %{url}/releases/latest/download/%{name}-%{version}-%{_arch}.tar.gz
 
 ExclusiveArch:  x86_64 aarch64
 
