@@ -18,15 +18,45 @@
 
 ## 📥 Installation
 
-Ensure you have Rust and Cargo installed, then build from source:
+### 📦 Fedora / RHEL (Fedora Copr)
 
+The easiest way to install and stay updated on Fedora or Enterprise Linux systems is via Copr:
+
+**Enable the Copr repository**
+```
+sudo dnf copr enable infiniti151/flatpak2spec
+```
+
+**Install flatpak2spec**
+```
+sudo dnf install flatpak2spec
+```
+
+### 🚀 Pre-compiled Binaries (GitHub Releases)
+
+If you prefer not to install via package manager or are running a non-RPM Linux distribution, grab the latest pre-compiled release binary for your architecture (x86_64 or aarch64):
+
+**Extract the release tarball**
+```
+tar -xzf flatpak2spec-*-x86_64.tar.gz
+```
+
+**Make executable and move to /usr/local/bin**
+```bash
+chmod +x flatpak2spec
+sudo mv flatpak2spec /usr/local/bin/
+```
+
+### 🛠️ Manual Build (From Source)
+
+Ensure you have Rust and Cargo installed, then build directly from source:
 ```bash
 git clone https://github.com/Infiniti151/flatpak2spec.git
 cd flatpak2spec
 cargo build --release
 ```
 
-The compiled binary will be available at `target/release/flatpak2spec`.
+The compiled binary will be available at target/release/flatpak2spec.
 
 ## 💻 Usage
 

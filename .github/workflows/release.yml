@@ -98,10 +98,10 @@ jobs:
           TAR_NAME="flatpak2spec-${VERSION}-${ARCH}.tar.gz"
           BIN_NAME="flatpak2spec-${VERSION}"
 
-          cd "target/${{ matrix.target }}/release"
-
-          cp flatpak2spec "$BIN_NAME"
-          tar -czvf "$GITHUB_WORKSPACE/$TAR_NAME" "$BIN_NAME"
+          # Create tarball containing the compiled binary, LICENSE, and README.md
+          tar -czvf "$GITHUB_WORKSPACE/$TAR_NAME" \
+            -C "target/${{ matrix.target }}/release" "$BIN_NAME" \
+            LICENSE README.md
 
       - name: Upload Artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -196,6 +196,8 @@ jobs:
 
           echo "Triggering COPR build for release v${RELEASE_NUMBER}..."
 
+          BASE_URL=$(echo "$COPR_WEBHOOK_URL" | xargs)
+          FINAL_URL="${BASE_URL%/}/flatpak2spec/"
           MAX_RETRIES=3
           DELAY=5
           SUCCESS=false
@@ -203,7 +205,7 @@ jobs:
           for ((i=1; i<=MAX_RETRIES; i++)); do
             echo "Attempt $i of $MAX_RETRIES..."
 
-            if curl -fsSL -X POST "$COPR_WEBHOOK_URL"; then
+            if curl -fsSL -X POST "$FINAL_URL"; then
               echo "Successfully triggered COPR build!"
               SUCCESS=true
               break
