@@ -170,14 +170,16 @@ jobs:
           sed -i '/%changelog/r changelog.tmp' "$SPEC_FILE"
           rm -f changelog.tmp
 
-      - name: Commit Spec Updates via Suzuki Commit Action
+      - name: Commit Spec and Cargo.toml Updates via Suzuki Commit Action
         uses: suzuki-shunsuke/commit-action@06e3b49d4706498d325d29bd85adc82ecf2f5d8f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           branch: main
-          commit_message: "🤖 chore(release): update spec file for ${{ env.TAG }}"
-          files: ${{ env.SPEC_FILE }}
+          commit_message: "🤖 chore(release): update release metadata for ${{ env.TAG }}"
+          files: |
+            ${{ env.SPEC_FILE }}
+            Cargo.toml
           fail_on_self_push: false
 
       - name: Download Artifacts
