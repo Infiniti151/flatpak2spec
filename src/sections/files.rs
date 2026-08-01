@@ -12,6 +12,8 @@ use std::path::Path;
 #[derive(Debug, Clone, Default)]
 pub struct FilesContext {
     pub binary_name: String,
+    pub extra_binaries: Vec<String>,
+    pub raw_project_name: String,
     pub has_i18n: bool,
     pub has_desktop: bool,
     pub has_metainfo: bool,
@@ -34,6 +36,9 @@ impl FilesContext {
         let manifest_id = manifest.and_then(|m| m.id.as_deref());
         let manifest_cmd = manifest.and_then(|m| m.command.as_deref());
 
+        let raw_project_name = meson_name.unwrap_or_default().to_string();
+        let raw_cmd = manifest_cmd.unwrap_or_default().to_string();
+
         let binary_name = match manifest_cmd {
             Some(cmd) => {
                 if Some(cmd) == meson_name {
@@ -46,6 +51,20 @@ impl FilesContext {
             }
             None => "%{name}".to_string(),
         };
+
+        // Collect extra binaries from Meson targets (executables & custom_targets)
+        let mut extra_binaries = Vec::new();
+        if let Some(m) = meson {
+            for bin in &m.installed_executables {
+                // Filter out primary binary candidates
+                let is_primary = bin == &raw_project_name || bin == &raw_cmd || bin == &binary_name;
+
+                if !is_primary && !extra_binaries.contains(bin) {
+                    extra_binaries.push(bin.clone());
+                }
+            }
+        }
+        extra_binaries.sort();
 
         let has_i18n = meson.map(|m| m.modules.has_i18n).unwrap_or(false)
             || check_file_extension(workspace, ".po");
@@ -62,6 +81,8 @@ impl FilesContext {
 
         Self {
             binary_name,
+            extra_binaries,
+            raw_project_name,
             has_i18n,
             has_desktop,
             has_metainfo,
@@ -76,6 +97,15 @@ impl FilesContext {
     }
 }
 
+/// Formats a binary name by replacing occurrences of the project name with `%{name}`.
+fn format_binary_macro(binary: &str, project_name: &str) -> String {
+    if !project_name.is_empty() && binary.contains(project_name) {
+        binary.replace(project_name, "%{name}")
+    } else {
+        binary.to_string()
+    }
+}
+
 /// Scans the workspace root for standard license and documentation files.
 fn scan_docs_and_licenses(workspace: &Path) -> (Vec<String>, Vec<String>) {
     let patterns = ["license", "copying", "readme", "news", "changelog"];
@@ -85,7 +115,6 @@ fn scan_docs_and_licenses(workspace: &Path) -> (Vec<String>, Vec<String>) {
     let mut licenses = Vec::new();
 
     for path in matching_paths {
-        // Only consider top-level workspace files
         if path.parent() == Some(workspace) {
             if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
                 let upper = name.to_uppercase();
@@ -124,8 +153,13 @@ pub fn generate_files_section(ctx: &FilesContext) -> String {
         out.push_str(&format!("%doc {}\n", ctx.doc_files.join(" ")));
     }
 
-    // 3. Executable
+    // 3. Main Executable & Subproject/Extra Executables
     out.push_str(&format!("%{{_bindir}}/{}\n", ctx.binary_name));
+
+    for extra_bin in &ctx.extra_binaries {
+        let formatted_bin = format_binary_macro(extra_bin, &ctx.raw_project_name);
+        out.push_str(&format!("%{{_bindir}}/{}\n", formatted_bin));
+    }
 
     // 4. Data Directories
     out.push_str(&format!("%{{_datadir}}/{}\n", ctx.binary_name));

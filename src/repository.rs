@@ -31,9 +31,13 @@ impl RepoResolver {
                     workspace_dir.display()
                 );
 
-                // Fast update instead of full re-clone
                 let _ = Command::new("git")
-                    .args(["pull", "--ff-only"])
+                    .args(["pull", "--ff-only", "--recurse-submodules"])
+                    .current_dir(&workspace_dir)
+                    .status();
+
+                let _ = Command::new("git")
+                    .args(["submodule", "update", "--init", "--recursive", "--depth=1"])
                     .current_dir(&workspace_dir)
                     .status();
 
@@ -105,6 +109,36 @@ impl RepoResolver {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("app")
+            .to_string()
+    }
+
+    /// Resolves the canonical HTTPS web URL from a workspace path (checking git remotes if local).
+    pub fn resolve_web_url(workspace_path: &Path) -> String {
+        let mut url = String::new();
+
+        // 1. Try reading git remote origin inside workspace_path
+        if workspace_path.join(".git").exists() {
+            if let Ok(output) = Command::new("git")
+                .args(["remote", "get-url", "origin"])
+                .current_dir(workspace_path)
+                .output()
+            {
+                if output.status.success() {
+                    let remote = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    if !remote.is_empty() {
+                        url = remote;
+                    }
+                }
+            }
+        }
+
+        // 2. Convert SSH remotes (git@github.com:user/repo.git) -> (https://github.com/user/repo)
+        if url.starts_with("git@") {
+            url = url.replace(':', "/").replace("git@", "https://");
+        }
+
+        url.trim_end_matches(".git")
+            .trim_end_matches('/')
             .to_string()
     }
 }

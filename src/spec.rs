@@ -4,6 +4,7 @@
 use crate::Cli;
 use crate::manifest::FlatpakManifest;
 use crate::meson::MesonProject;
+use crate::repository::RepoResolver;
 use crate::sections::build::BuildSection;
 use crate::sections::changelog::ChangelogContext;
 use crate::sections::deps::DepsSection;
@@ -25,17 +26,15 @@ impl SpecGenerator {
     ) -> String {
         let mut spec = String::new();
 
-        let app_id = manifest.get_app_id().unwrap_or("app");
-
-        // %global app_id
-        spec.push_str(&format!("{:16}{} {}\n\n", "%global", "app_id", app_id));
+        // Resolve canonical web URL for forge-srpm-macros (%global forgeurl)
+        let canonical_url = RepoResolver::resolve_web_url(&workspace_path);
 
         // 1. Preamble / Header block
         let header = HeaderSection::generate(
             manifest,
             meson,
             workspace_path,
-            &cli.repo,
+            &canonical_url,
             cli.bug_url.as_deref(),
         );
         spec.push_str(&header);

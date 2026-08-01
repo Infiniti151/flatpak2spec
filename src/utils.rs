@@ -2,7 +2,9 @@
 // Copyright (C) 2026 Infiniti151
 
 use colored::Colorize;
+use regex::Regex;
 use roxmltree::Node;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::manifest::FlatpakManifest;
@@ -252,6 +254,24 @@ pub fn collect_node_text(node: Node) -> String {
     let combined = text_parts.join("");
     // Replace contiguous whitespace/newlines with a single space
     combined.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Scans matching files in a directory for a regex pattern and returns the first capture group.
+pub fn find_and_extract_regex(dir: &Path, patterns: &[&str], re: &Regex) -> Option<String> {
+    let matching_files = find_matching_files(dir, patterns);
+
+    for path in matching_files {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Some(caps) = re.captures(&content) {
+                let val = caps[1].trim().to_string();
+                if !val.is_empty() {
+                    return Some(val);
+                }
+            }
+        }
+    }
+
+    None
 }
 
 pub fn print_info(message: &str) {

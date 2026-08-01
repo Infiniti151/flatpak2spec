@@ -1,20 +1,27 @@
 # flatpak2spec
-[![Build](https://img.shields.io/github/actions/workflow/status/Infiniti151/flatpak2spec/release.yml?branch=main&style=for-the-badge&logo=github-actions&logoColor=white&label=Build&color=%23007808)](https://github.com/Infiniti151/flatpak2spec/actions/workflows/release.yml) [![COPR Build Status](https://img.shields.io/badge/dynamic/json?url=https://copr.fedorainfracloud.org/api_3/build/list/%3Fownername%3Dinfiniti151%26projectname%3Dflatpak2spec%26packagename%3Dflatpak2spec%26limit%3D1&query=$.items[0].state&label=COPR&style=for-the-badge&logo=fedora&logoColor=white&color=%2351A2DA)](https://copr.fedorainfracloud.org/coprs/infiniti151/flatpak2spec/package/flatpak2spec/) [![Latest Release](https://img.shields.io/github/v/release/Infiniti151/flatpak2spec?style=for-the-badge&logo=github&color=blue)](https://github.com/Infiniti151/flatpak2spec/releases) [![Downloads](https://img.shields.io/github/downloads/Infiniti151/flatpak2spec/total.svg?style=for-the-badge&logo=github&color=orange)](https://github.com/Infiniti151/flatpak2spec/releases) [![License](https://img.shields.io/github/license/Infiniti151/flatpak2spec?style=for-the-badge&logo=spdx&logoColor=white&color=yellow&label=License)](https://github.com/Infiniti151/flatpak2spec/blob/main/LICENSE)
+[![Build](https://img.shields.io/github/actions/workflow/status/Infiniti151/flatpak2spec/release.yml?branch=main&style=for-the-badge&logo=github-actions&logoColor=white&label=Build&color=%23007808)](https://github.com/Infiniti151/flatpak2spec/actions/workflows/release.yml) [![COPR Build Status](https://img.shields.io/badge/dynamic/json?url=https://copr.fedorainfracloud.org/api_3/build/list/%3Fownername%3Dinfiniti151%26projectname%3Dflatpak2spec%26packagename%3Dflatpak2spec%26limit%3D1&query=$.items[0].state&label=COPR&style=for-the-badge&logo=fedora&logoColor=white&color=%2351A2DA)](https://copr.fedorainfracloud.org/coprs/infiniti151/flatpak2spec/package/flatpak2spec/) [![Latest Release](https://img.shields.io/github/v/release/Infiniti151/flatpak2spec?style=for-the-badge&logo=github&color=orange)](https://github.com/Infiniti151/flatpak2spec/releases) [![License](https://img.shields.io/github/license/Infiniti151/flatpak2spec?style=for-the-badge&logo=spdx&logoColor=white&color=yellow&label=License)](https://github.com/Infiniti151/flatpak2spec/blob/main/LICENSE)
 
-`flatpak2spec` is a fast, robust Rust CLI tool designed to inspect Flatpak application repositories (or remote URLs) and automatically generate production-ready, Fedora-compliant RPM .spec files following official Fedora Packaging Guidelines.
+`flatpak2spec` is a fast, robust Rust CLI tool designed to inspect Flatpak application repositories (or remote URLs) and automatically generate idiomatic Fedora RPM `.spec` files. By parsing Flatpak manifests (`JSON`/`YAML`), AppStream metadata, and build configurations, it bridges the gap between containerized app specs and native RPM packaging—optimizing the output out-of-the-box for Fedora Copr, GitHub Actions, and online CI pipelines.
 
 > [!IMPORTANT]
 > **Build System Support:** `flatpak2spec` currently supports Flatpak manifests that utilize the **Meson** build system (`buildstream` / `meson` build options). Support for Cargo, CMake, and Autotools build systems is planned for future releases.
 
 ## ✨ Features
 
-- 🚀 **Remote & Local Repositories:** Supports direct cloning and workspace parsing from GitHub, GitLab, Codeberg, or local filesystem directories.
+- 🚀 **Remote & Local Workspace Inspection:** Supports direct workspace parsing from local filesystem directories or remote repositories on GitHub, GitLab, and Codeberg.
 - 📦 **Manifest & Metadata Parsing:** Inspects Flatpak JSON/YAML manifests, AppStream metadata (`.metainfo.xml`), and Meson project configurations (`meson.build`).
 - 📝 **Changelog & Release Notes Extraction:** Automatically parses project changelogs and release notes to populate the RPM `%changelog` section cleanly.
-- 🏷️ **Smart Version & Forge Detection:** Queries remote forge tags to determine the latest semantic release version, handles URL prefixes (`v1.0` vs `1.0`), and formats accurate `Source0` download links.
-- 🛠️ **Fedora-Compliant Output:** Generates clean RPM spec files adhering to modern Fedora packaging standards, including standard macros (`%meson`, `%meson_build`, `%find_lang`) and `%check` validation steps (`desktop-file-validate`, `appstream-util`).
-- ⚡ **Copr & CI-Ready:** Optimized out-of-the-box for online build environments such as Fedora Copr, GitHub Actions, and local `mock` chroots.
+- 🏷️ **Smart Version & Forge Detection:** Queries remote forge tags to determine the latest semantic release version, handles URL prefixes (`v1.0` vs `1.0`), and formats accurate `%forgesetup` or `Source0` download links.
+- 🔄 **Automatic Submodule Handling:** Detects `.gitmodules` within target repositories and emits Git fetching logic in `%prep` to streamline online CI archive builds.
+- 🛠️ **Idiomatic Spec Output:** Leverages modern Fedora packaging macros (`%meson`, `%meson_build`, `%find_lang`) and `%check` validation steps (`desktop-file-validate`, `appstream-util`).
+- ⚡ **Copr & CI-Ready:** Built specifically for automated online build environments such as Fedora Copr (with internet enabled), GitHub Actions, and `mock` chroots.
 - 🎯 **Noarch Detection:** Automatically detects asset-only or script projects to emit `BuildArch: noarch` when appropriate.
+
+> [!NOTE]
+> **Build Environment Compatibility:**
+> Spec files generated by `flatpak2spec` are designed for **online, automated build environments** (such as Fedora Copr with network access enabled, GitHub Actions, or local mock chroots with network enabled).
+>
+> Because these specs fetch missing Git submodules during `%prep` over the network, they are **not directly intended for official Fedora Koji submission**, which strictly requires offline/network-isolated builds and pre-bundled source archives.
 
 ## 📥 Installation
 
@@ -79,77 +86,88 @@ Options:
 Command:
 
 ```
-flatpak2spec -b https://github.com/Infiniti151/flatpak-apps -p Infiniti151 -e 43163551+Infiniti151@users.noreply.github.com -r https://github.com/alainm23/planify
+flatpak2spec -b https://github.com/Infiniti151/flatpak-apps -p Infiniti151 -e 43163551+Infiniti151@users.noreply.github.com -r https://gitlab.com/mission-center-devs/mission-center
 ```
 
 Output:
 ```
-%global         app_id io.github.alainm23.planify.Devel
+%global         app_id        io.missioncenter.MissionCenter
+%global         forgeurl      https://gitlab.com/mission-center-devs/mission-center
+%global         tag           v%{version}
 
-Name:           planify
-Version:        4.19.5
+Name:           missioncenter
+Version:        1.2.0
 Release:        1%{?dist}
-Summary:        Forget about forgetting things
-License:        GPL-3.0+
-URL:            https://github.com/alainm23/planify
+Summary:        Monitor system resource usage
+License:        GPL-3.0-or-later
 BugURL:         https://github.com/Infiniti151/flatpak-apps
 
-Source0:        %{url}/archive/v%{version}.tar.gz
+%forgemeta
 
-BuildRequires:  meson
+URL:            %{forgeurl}
+Source0:        %{forgesource}
+
+BuildRequires:  meson >= 0.63.0
 BuildRequires:  ninja-build
+BuildRequires:  blueprint-compiler
+BuildRequires:  cargo
+BuildRequires:  cargo-rpm-macros
+BuildRequires:  cmake
 BuildRequires:  desktop-file-utils
+BuildRequires:  forge-srpm-macros
 BuildRequires:  gcc
 BuildRequires:  gettext
+BuildRequires:  glib2-devel
 BuildRequires:  glibc-langpack-en
 BuildRequires:  gtk-update-icon-cache
 BuildRequires:  libappstream-glib
-BuildRequires:  pkgconfig(chrono)
-BuildRequires:  pkgconfig(gee-0.8)
-BuildRequires:  pkgconfig(gio-2.0)
-BuildRequires:  pkgconfig(glib-2.0)
-BuildRequires:  pkgconfig(gtk4)
-BuildRequires:  pkgconfig(gtksourceview-5)
-BuildRequires:  pkgconfig(gxml-0.20)
-BuildRequires:  pkgconfig(icu-uc)
-BuildRequires:  pkgconfig(json-glib-1.0)
-BuildRequires:  pkgconfig(libadwaita-1) >= 1.7.0
-BuildRequires:  pkgconfig(libecal-2.0) >= 3.45.1
-BuildRequires:  pkgconfig(libedataserver-1.2) >= 3.45.1
-BuildRequires:  pkgconfig(libical-glib)
-BuildRequires:  pkgconfig(libportal)
-BuildRequires:  pkgconfig(libportal-gtk4)
-BuildRequires:  pkgconfig(libsecret-1)
-BuildRequires:  pkgconfig(libsoup-3.0)
-BuildRequires:  pkgconfig(libspelling-1)
-BuildRequires:  pkgconfig(sqlite3)
-BuildRequires:  valac
+BuildRequires:  patch
+BuildRequires:  pkgconfig(gbm)
+BuildRequires:  pkgconfig(libdrm)
+BuildRequires:  pkgconfig(libudev)
+BuildRequires:  python3-devel
+BuildRequires:  rustc
+
+Requires:       gtk4
+Requires:       hicolor-icon-theme
+Requires:       libadwaita
 
 %description
-Planify is your modern and powerful task manager that helps you keep your life organized. With a clean and intuitive interface, cloud synchronization, and advanced features, you'll never forget what matters again.
+Monitor your CPU, Memory, Disk, Network and GPU usage, accompanied by a per app and process breakdown of these statistics
 
-✨ Core Features:
-- Modern and clean interface designed with GTK4 and libadwaita
-- Drag and drop to organize tasks and projects effortlessly
-- Visual progress indicators for each project
-- Smart organization with sections and custom labels
-- Calendar integration to visualize your schedule
-- Multiple reminders per task to never miss a deadline
-- Dark mode with seamless system theme integration
-- Quick and powerful search to find anything instantly
-- Recurring tasks with flexible patterns
-- Attachments and links in your tasks
+Features:
+- Monitor overall or per-thread CPU usage
+- See system process, thread, and handle count, uptime, clock speed (base and current), cache sizes
+- Monitor RAM and Swap usage
+- See a breakdown how the memory is being used by the system
+- Monitor Disk utilization and transfer rates
+- Monitor network utilization and transfer speeds
+- See network interface information such as network card name, connection type (Wi-Fi or Ethernet), wireless speeds and frequency, hardware address, IP address
+- Monitor overall GPU usage, video encoder and decoder usage, memory usage and power consumption, powered by the popular NVTOP project
+- Monitor system fans
+- See a breakdown of resource usage by app and process
+- Supports a minified summary view for simple monitoring
+- Use hardware accelerated rendering for all the graphs in an effort to reduce CPU and overall resource usage
+- Uses GTK4 and Libadwaita
+- Written in Rust
 
-☁️ Cloud Synchronization:
-- Full synchronization with Todoist to access your tasks from anywhere
-- Support for Nextcloud and CalDAV servers (Radicale, Baïkal) to keep your data private
-- Offline mode: work without internet and sync when you're back online
-- Cross-platform synchronization to access from any device
+Limitations (there is ongoing work to overcome all of these):
+- Intel GPU monitoring is only supported for Broadwell and later GPUs; and does not support VRAM, power, or temperature monitoring
+- When using Linux Mint/Cinnamon, launched applications may not show up in the "Applications" section (Upstream issue: https://github.com/linuxmint/cinnamon/issues/12015)
 
-* Planify is not created by, affiliated with, or supported by Doist
+Comments, suggestions, bug reports and contributions welcome
 
 %prep
-%autosetup -C -p1
+%forgesetup
+
+# Re-initialize git context for forge tarballs to resolve submodules
+if [ ! -d ".git" ]; then
+        git init -q
+        git remote add origin %{forgeurl}
+        git fetch -q --depth 1 origin %{tag}
+        git checkout -q -f FETCH_HEAD
+fi
+git submodule update --init --recursive
 
 %build
 %meson
@@ -166,28 +184,28 @@ appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/*.metainfo.xml
 glib-compile-schemas --dry-run --strict %{buildroot}%{_datadir}/glib-2.0/schemas/
 
 %files -f %{name}.lang
-%license LICENSE
+%license COPYING
 %doc README.md
-%{_bindir}/%{app_id}
-%{_datadir}/%{app_id}
+%{_bindir}/%{name}
+%{_bindir}/%{name}-magpie
+%{_datadir}/%{name}
 %{_datadir}/applications/%{app_id}.desktop
 %{_datadir}/icons/hicolor/*/apps/%{app_id}*
 %{_datadir}/glib-2.0/schemas/*.gschema.xml
-%{_datadir}/dbus-1/services/*.service
 %{_metainfodir}/%{app_id}.metainfo.xml
 
 %changelog
-* Fri Jul 31 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 4.19.5-1
-- Planify 4.19.5 is a maintenance release focused on bug fixes, reliability improvements, and new features.
-- Bug Fixes:
-- Fixed missed automatic backup on startup — if Planify was closed at midnight, the scheduled backup was silently skipped. Now, if automatic backup is enabled and no backup has run today, one is triggered immediately on startup.
-- Fixed completing a recurring task from a notification — it was marking the task as fully completed instead of advancingto the next occurrence. Now correctly calls update_next_recurrency() as the UI does.
-- Fixed keyboard navigation UX — Tab in EditableTextView now moves focus to the next widget instead of inserting spaces, and pressing Enter on a focused checkbox now completes the task.
-- Fixed attachment file_size integer overflow — file_size is now treated as a string throughout, preventing unhandled overflow errors for values ≥ 2^63.
-- Fixed drag and drop reliability and visual feedback in ReorderChild — softer background, subtle border, and rounder corners using the accent color.
-- Fixed CalDAV related-to parsing — uses the already known related-id from libical and checks the reltype param to determine if a task is a parent.
-- Fixed reading X-PINNED and X-APPLE-SORT-ORDER from CalDAV — replaced ICal.PropertyKind.from_string() with iteration over X_PROPERTY kind and matching by get_x_name(), fixing pin status and sort order persistence with Radicale and other servers.
-- New Features:
+* Sat Aug 01 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 1.2.0-1
+- Noteworthy changes:
+- Add a new Battery page to the Performance tab, with charge graphs and detailed battery information (@jlo62)
+- Show per-partition usage details on the disk page, including used and free space (@jojo2357)
+- Overhaul the graphing backend: smoother animations and rendering, a new loading shimmer while data loads, and less stuttering on application startup (@jojo2357, @kicsyromy)
+- Improve application detection, fixing wrong names and icons, phantom entries for PWAs, and constantly cycling processes (@kicsyromy)
+- Improvements to the Snap package, which was upgraded to the core24 snap (@kicsyromy)
+- Improvements to the AppImage package which now uses quick-sharun, is smaller and no longer depends on FUSE (@kicsyromy)
+- Minor features:
+- Add a second CPU graph that can show temperature, power draw or CPU frequency (@jlo62)
+- Add memory compression (zRAM/zswap) statistics to the Memory page (@timatgca)
 - ... see upstream for full release notes
 ```
 
@@ -203,7 +221,6 @@ flatpak2spec/
     ├── main.rs                     # Entry point: orchestrates CLI args, workspace cloning, and pipeline execution
     ├── spec.rs                     # Assembles all generated section strings into a final RPM .spec file
     ├── repository.rs               # Workspace preparation and remote Git repository cloning logic
-    ├── forge.rs                    # Detects Git hosts (GitHub, GitLab, Codeberg) to format Source URLs
     ├── manifest.rs                 # Flatpak manifest parser and validation engine
     ├── meson.rs                    # Meson build file inspection and metadata extraction
     ├── utils.rs                    # Common filesystem, regex search, and string helper utilities

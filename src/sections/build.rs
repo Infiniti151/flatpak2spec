@@ -13,7 +13,22 @@ impl BuildSection {
 
         // %prep
         section.push_str("%prep\n");
-        section.push_str("%autosetup -C -p1\n\n");
+        section.push_str("%forgesetup\n");
+
+        if workspace_path.join(".gitmodules").exists() {
+            section.push_str(
+                "\n# Re-initialize git context for forge tarballs to resolve submodules\n\
+                 if [ ! -d \".git\" ]; then\n\
+                 \tgit init -q\n\
+                 \tgit remote add origin %{forgeurl}\n\
+                 \tgit fetch -q --depth 1 origin %{tag}\n\
+                 \tgit checkout -q -f FETCH_HEAD\n\
+                 fi\n\
+                 git submodule update --init --recursive\n",
+            );
+        }
+
+        section.push('\n');
 
         // %build
         section.push_str("%build\n");
@@ -26,7 +41,7 @@ impl BuildSection {
         if meson.has_po_subdir() {
             section.push_str("%find_lang %{name}\n");
         }
-        if meson.has_python {
+        if meson.is_python_app {
             section.push_str("%py3_shebang_fix %{buildroot}%{_bindir}/%{name} %{buildroot}%{_datadir}/%{name}/\n");
         }
         section.push('\n');

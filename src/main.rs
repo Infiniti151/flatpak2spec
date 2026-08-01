@@ -6,7 +6,6 @@ use clap::Parser;
 use std::fs;
 use std::path::PathBuf;
 
-mod forge;
 mod manifest;
 mod meson;
 mod repository;
@@ -93,9 +92,6 @@ fn run() -> Result<()> {
 
     if cli.verbose > 0 {
         print_info(&format!("Verbosity level: {}", cli.verbose));
-        if let Some(ref url) = cli.bug_url {
-            println!("Bug URL:     {url}");
-        }
     }
 
     // 1. Prepare Workspace

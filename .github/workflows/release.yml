@@ -77,6 +77,27 @@ jobs:
             exit 1
           fi
 
+      - name: Sync Version from CHANGELOG to Cargo.toml
+        run: |
+          CHANGELOG_VERSION=$(grep -m 1 -E '^## \[v?[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | sed -E 's/^## \[v?([0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?)\].*/\1/')
+
+          if [ -z "$CHANGELOG_VERSION" ]; then
+            echo "::error::Could not extract a valid version from CHANGELOG.md!"
+            exit 1
+          fi
+
+          CARGO_VERSION=$(grep -m 1 -E '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+
+          echo "CHANGELOG version: $CHANGELOG_VERSION"
+          echo "Cargo.toml version: $CARGO_VERSION"
+
+          if [ "$CHANGELOG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "Version mismatch detected. Updating Cargo.toml to $CHANGELOG_VERSION..."
+            sed -i -E "0,/^version = \"[^\"]*\"/s//version = \"$CHANGELOG_VERSION\"/" Cargo.toml
+          else
+            echo "Cargo.toml is already up to date ($CARGO_VERSION). Skipping update."
+          fi
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
         with:
