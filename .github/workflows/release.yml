@@ -48,6 +48,18 @@ jobs:
 
           VERSION="${TAG#v}"
 
+          CHANGELOG_VERSION=$(grep -m 1 -E '^## \[' CHANGELOG.md | sed -E 's/^## \[([^]]+)\].*/\1/')
+
+          echo "Detected Git Tag Version: $VERSION"
+          echo "Detected Changelog Version: $CHANGELOG_VERSION"
+
+          if [ "$VERSION" != "$CHANGELOG_VERSION" ]; then
+            echo "::error::Version mismatch detected! Git tag version ($VERSION) does not match CHANGELOG.md version ($CHANGELOG_VERSION)."
+            exit 1
+          fi
+
+          echo "Versions match! Proceeding with build and publish."
+
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "release_number=$VERSION" >> $GITHUB_OUTPUT
 
@@ -77,26 +89,9 @@ jobs:
             exit 1
           fi
 
-      - name: Sync Version from CHANGELOG to Cargo.toml
+      - name: Sync Cargo.toml Version
         run: |
-          CHANGELOG_VERSION=$(grep -m 1 -E '^## \[v?[0-9]+\.[0-9]+\.[0-9]+' CHANGELOG.md | sed -E 's/^## \[v?([0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?)\].*/\1/')
-
-          if [ -z "$CHANGELOG_VERSION" ]; then
-            echo "::error::Could not extract a valid version from CHANGELOG.md!"
-            exit 1
-          fi
-
-          CARGO_VERSION=$(grep -m 1 -E '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
-
-          echo "CHANGELOG version: $CHANGELOG_VERSION"
-          echo "Cargo.toml version: $CARGO_VERSION"
-
-          if [ "$CHANGELOG_VERSION" != "$CARGO_VERSION" ]; then
-            echo "Version mismatch detected. Updating Cargo.toml to $CHANGELOG_VERSION..."
-            sed -i -E "0,/^version = \"[^\"]*\"/s//version = \"$CHANGELOG_VERSION\"/" Cargo.toml
-          else
-            echo "Cargo.toml is already up to date ($CARGO_VERSION). Skipping update."
-          fi
+          sed -i -E "0,/^version = \"[^\"]*\"/s//version = \"$VERSION\"/" Cargo.toml
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
@@ -149,6 +144,10 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.1
         with:
           fetch-depth: 0
+
+      - name: Sync Cargo.toml Version
+        run: |
+          sed -i -E "0,/^version = \"[^\"]*\"/s//version = \"$VERSION\"/" Cargo.toml
 
       - name: Parse Changelog & Update Spec
         run: |
