@@ -48,17 +48,7 @@ jobs:
 
           VERSION="${TAG#v}"
 
-          CHANGELOG_VERSION=$(grep -m 1 -E '^## \[' CHANGELOG.md | sed -E 's/^## \[([^]]+)\].*/\1/')
-
           echo "Detected Git Tag Version: $VERSION"
-          echo "Detected Changelog Version: $CHANGELOG_VERSION"
-
-          if [ "$VERSION" != "$CHANGELOG_VERSION" ]; then
-            echo "::error::Version mismatch detected! Git tag version ($VERSION) does not match CHANGELOG.md version ($CHANGELOG_VERSION)."
-            exit 1
-          fi
-
-          echo "Versions match! Proceeding with build and publish."
 
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "release_number=$VERSION" >> $GITHUB_OUTPUT
@@ -149,27 +139,116 @@ jobs:
         run: |
           sed -i -E "0,/^version = \"[^\"]*\"/s//version = \"$VERSION\"/" Cargo.toml
 
-      - name: Parse Changelog & Update Spec
+      - name: Generate Latest Release Notes with git-cliff
+        uses: orhun/git-cliff-action@5d3a6702d0a4ea1318aab88bd87a9d3df156eb0f # v2.13.1
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: release_notes.md
+
+      - name: Prepend Latest Release to CHANGELOG.md
+        uses: orhun/git-cliff-action@5d3a6702d0a4ea1318aab88bd87a9d3df156eb0f # v2.13.1
+        with:
+          config: cliff.toml
+          args: --latest --prepend CHANGELOG.md
+
+      - name: Format Changelog for Spec File
         run: |
-          awk '/^## \[/ { if (count++) exit } count { print }' CHANGELOG.md | grep -v '^#' > release_notes.md
+          sed -i "s/^Version:[[:space:]]*.*/Version:        ${VERSION}/" "$SPEC_FILE"
 
           DATE_STR=$(date "+%a %b %d %Y")
           CHLOG_HDR="* $DATE_STR Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - ${VERSION}-1"
 
-          CLEAN_BODY=$(sed '/^$/d' release_notes.md)
+          RAW_ENTRIES=$(grep -E '^[[:space:]]*[-*]' release_notes.md | sed -E 's/^[[:space:]]*[-*][[:space:]]*/- /' | sed -E 's/\*//g' | sed -E 's/\([a-f0-9]{7,40}\)//g')
 
-          sed -i "s/^Version:[[:space:]]*.*/Version:        ${VERSION}/" "$SPEC_FILE"
+          TOTAL_LINES=$(echo "$RAW_ENTRIES" | grep -c '^')
+          if [ "$TOTAL_LINES" -gt 10 ]; then
+            FORMATTED_BODY=$(echo "$RAW_ENTRIES" | head -n 10)
+            FORMATTED_BODY+=$'\n- ... see upstream for full release notes'
+          else
+            FORMATTED_BODY="$RAW_ENTRIES"
+          fi
 
           cat <<EOF > changelog.tmp
           $CHLOG_HDR
-          $CLEAN_BODY
+          $FORMATTED_BODY
 
           EOF
 
           sed -i '/%changelog/r changelog.tmp' "$SPEC_FILE"
           rm -f changelog.tmp
 
-      - name: Commit Spec and Cargo.toml Updates via Suzuki Commit Action
+      - name: Download Artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Sign Tarball Archives with SSH Key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.RELEASE_SSH_PRIVATE_KEY }}
+          SSH_PASSPHRASE: ${{ secrets.RELEASE_SSH_PASSPHRASE }}
+          SSH_AUTH_SOCK: "" # Prevents ssh-agent interference
+        run: |
+          set -e
+
+          if [[ -z "$SSH_PRIVATE_KEY" || -z "$SSH_PASSPHRASE" ]]; then
+            echo "::error::RELEASE_SSH_PRIVATE_KEY or RELEASE_SSH_PASSPHRASE secret is missing!"
+            exit 1
+          fi
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/release_key
+          chmod 600 ~/.ssh/release_key
+
+          trap 'rm -f ~/.ssh/release_key' EXIT
+
+          shopt -s nullglob
+          tarballs=(release-assets/*.tar.gz)
+
+          if [ ${#tarballs[@]} -eq 0 ]; then
+            echo "::error::No tarballs found in release-assets/!"
+            exit 1
+          fi
+
+          for tarball in "${tarballs[@]}"; do
+            echo "Signing $tarball..."
+
+            export CURRENT_TARBALL="$tarball"
+
+            expect -c '
+              spawn ssh-keygen -Y sign -f $env(HOME)/.ssh/release_key -n file $env(CURRENT_TARBALL)
+              expect {
+                "Enter passphrase*" {
+                  send "$env(SSH_PASSPHRASE)\r"
+                  exp_continue
+                }
+                timeout {
+                  send_user "\n::error file=$env(CURRENT_TARBALL),title=Signing Timeout::Timed out waiting for passphrase prompt while signing $env(CURRENT_TARBALL)\n"
+                  exit 1
+                }
+                eof
+              }
+
+              # Capture the exit status of ssh-keygen
+              catch wait result
+              set exit_code [lindex $result 3]
+
+              if { $exit_code != 0 } {
+                send_user "\n::error file=$env(CURRENT_TARBALL),title=Signing Failed::ssh-keygen failed with exit code $exit_code for $env(CURRENT_TARBALL)\n"
+                exit $exit_code
+              }
+            '
+          done
+
+      - name: Attest tarball archives
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: release-assets/*.tar.gz
+
+      - name: Commit Updates
         uses: suzuki-shunsuke/commit-action@06e3b49d4706498d325d29bd85adc82ecf2f5d8f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -179,25 +258,17 @@ jobs:
           files: |
             ${{ env.SPEC_FILE }}
             Cargo.toml
+            CHANGELOG.md
           fail_on_self_push: false
-
-      - name: Download Artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          path: release-assets
-          merge-multiple: true
-
-      - name: Attest tarball archives
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
-        with:
-          subject-path: release-assets/*.tar.gz
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           tag_name: ${{ env.TAG }}
           name: ${{ env.TAG }}
-          files: release-assets/*.tar.gz
+          files: |
+            release-assets/*.tar.gz
+            release-assets/*.tar.gz.sig
           body_path: release_notes.md
 
   trigger-copr:

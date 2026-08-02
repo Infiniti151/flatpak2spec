@@ -29,30 +29,48 @@
 
 The easiest way to install and stay updated on Fedora or Enterprise Linux systems is via Copr:
 
-**Enable the Copr repository**
-```
-sudo dnf copr enable infiniti151/flatpak2spec
-```
+1. **Enable the Copr repository**
 
-**Install flatpak2spec**
-```
-sudo dnf install flatpak2spec
-```
+    ```bash
+    sudo dnf copr enable infiniti151/flatpak2spec
+    ```
+
+2. **Install flatpak2spec**
+
+    ```bash
+    sudo dnf install flatpak2spec
+    ```
 
 ### 🚀 Pre-compiled Binaries (GitHub Releases)
 
-If you prefer not to install via package manager or are running a non-RPM Linux distribution, grab the latest pre-compiled release binary for your architecture (x86_64 or aarch64):
+If you prefer not to install via package manager or are running a non-RPM Linux distribution, grab the latest pre-compiled release binary tarball and its corresponding `.sig` signature for your architecture (x86_64 or aarch64):
 
-**Extract the release tarball**
-```
-tar -xzf flatpak2spec-*-x86_64.tar.gz
-```
+1. **Verify the SSH signature**
 
-**Make executable and move to /usr/local/bin**
-```bash
-chmod +x flatpak2spec
-sudo mv flatpak2spec /usr/local/bin/
-```
+    Create a temporary allowed signers file in `/tmp` and verify the tarball signature:
+
+    ```bash
+    # Add the signer's SSH public key to /tmp/allowed_signers
+    echo "43163551+Infiniti151@users.noreply.github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILTdQcJHfsMenp/k1A6ANxCqDJKvj3wp1d+7wSQCYwSU" > /tmp/allowed_signers
+
+    # Verify the signature against the release archive
+    ssh-keygen -Y verify -f /tmp/allowed_signers -I 43163551+Infiniti151@users.noreply.github.com -n file flatpak2spec-*.tar.gz.sig < flatpak2spec-*.tar.gz
+    ```
+
+    *A successful output will read: `Good "file" signature for 43163551+Infiniti151@users.noreply.github.com with ED25519 key SHA256:5zeSTkU1qsZrkkCW4w2TKlD61J9eTihMPVx6lhgL92M`*
+
+2. **Extract the release tarball**
+
+    ```bash
+    tar -xzf flatpak2spec-*.tar.gz
+    ```
+
+3. **Make executable and move to /usr/local/bin**
+
+    ```bash
+    chmod +x flatpak2spec
+    sudo mv flatpak2spec /usr/local/bin/
+    ```
 
 ### 🛠️ Manual Build (From Source)
 
@@ -85,7 +103,7 @@ Options:
 
 Command:
 
-```
+```bash
 flatpak2spec -b https://github.com/Infiniti151/flatpak-apps -p Infiniti151 -e 43163551+Infiniti151@users.noreply.github.com -r https://gitlab.com/mission-center-devs/mission-center
 ```
 
