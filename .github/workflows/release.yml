@@ -79,22 +79,32 @@ jobs:
             exit 1
           fi
 
+      - name: Check Artifact Cache
+        id: cache_binary
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: "${{ env.BIN_NAME }}-${{ steps.set_version.outputs.release_number }}-${{ matrix.arch }}.tar.gz"
+          key: binary-cache-${{ steps.set_version.outputs.tag }}-${{ matrix.arch }}
+
       - name: Sync Cargo.toml Version
+        if: steps.cache_binary.outputs.cache-hit != 'true'
         run: |
           sed -i -E "0,/^version = \"[^\"]*\"/s//version = \"$VERSION\"/" Cargo.toml
 
       - name: Install Rust stable
+        if: steps.cache_binary.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
 
       - name: Install Cross-compilation Tools
-        if: matrix.use_cross
+        if: matrix.use_cross && steps.cache_binary.outputs.cache-hit != 'true'
         run: |
           cargo install cross --git https://github.com/cross-rs/cross
 
       - name: Build binary
+        if: steps.cache_binary.outputs.cache-hit != 'true'
         run: |
           if [ "${{ matrix.use_cross }}" = "true" ]; then
             cross build --release --target ${{ matrix.target }}
@@ -103,6 +113,7 @@ jobs:
           fi
 
       - name: Package Tarball
+        if: steps.cache_binary.outputs.cache-hit != 'true'
         run: |
           TAR_NAME="${BIN_NAME}-${VERSION}-${ARCH}.tar.gz"
           cp "target/${{ matrix.target }}/release/${BIN_NAME}" "./${BIN_NAME}"
@@ -141,7 +152,7 @@ jobs:
           sed -i -E "/name = \"${BIN_NAME}\"/,/version =/ s/(version = \")[^\"]*(\")/\1${VERSION}\2/" Cargo.lock
 
       - name: Generate Latest Release Notes with git-cliff
-        uses: orhun/git-cliff-action@5d3a6702d0a4ea1318aab88bd87a9d3df156eb0f # v2.13.1
+        uses: orhun/git-cliff@5d3a6702d0a4ea1318aab88bd87a9d3df156eb0f # v2.13.1
         with:
           config: cliff.toml
           args: --latest --strip header
@@ -149,7 +160,7 @@ jobs:
           OUTPUT: release_notes.md
 
       - name: Prepend Latest Release to CHANGELOG.md
-        uses: orhun/git-cliff-action@5d3a6702d0a4ea1318aab88bd87a9d3df156eb0f # v2.13.1
+        uses: orhun/git-cliff@5d3a6702d0a4ea1318aab88bd87a9d3df156eb0f # v2.13.1
         with:
           config: cliff.toml
           args: --latest --prepend CHANGELOG.md
