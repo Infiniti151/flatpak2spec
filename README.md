@@ -1,5 +1,5 @@
 # flatpak2spec
-[![Build](https://img.shields.io/github/actions/workflow/status/Infiniti151/flatpak2spec/release.yml?branch=main&style=for-the-badge&logo=github-actions&logoColor=white&label=Build&color=%23007808)](https://github.com/Infiniti151/flatpak2spec/actions/workflows/release.yml) [![COPR Build Status](https://img.shields.io/badge/dynamic/json?url=https://copr.fedorainfracloud.org/api_3/build/list/%3Fownername%3Dinfiniti151%26projectname%3Dflatpak2spec%26packagename%3Dflatpak2spec%26limit%3D1&query=$.items[0].state&label=COPR&style=for-the-badge&logo=fedora&logoColor=white&color=%2351A2DA)](https://copr.fedorainfracloud.org/coprs/infiniti151/flatpak2spec/package/flatpak2spec/) [![Latest Release](https://img.shields.io/github/v/release/Infiniti151/flatpak2spec?style=for-the-badge&logo=github&color=orange)](https://github.com/Infiniti151/flatpak2spec/releases) [![License](https://img.shields.io/github/license/Infiniti151/flatpak2spec?style=for-the-badge&logo=spdx&logoColor=white&color=yellow&label=License)](https://github.com/Infiniti151/flatpak2spec/blob/main/LICENSE)
+[![Build](https://img.shields.io/github/actions/workflow/status/Infiniti151/flatpak2spec/release.yml?branch=main&style=for-the-badge&logo=github-actions&logoColor=white&label=Build&color=%23007808)](https://github.com/Infiniti151/flatpak2spec/actions/workflows/release.yml) [![COPR Build Status](https://img.shields.io/badge/dynamic/json?url=https://copr.fedorainfracloud.org/api_3/build/list/%3Fownername%3Dinfiniti151%26projectname%3Dflatpak2spec%26packagename%3Dflatpak2spec%26limit%3D1&query=$.items[0].state&label=COPR&style=for-the-badge&logo=fedora&logoColor=white&color=%2351A2DA)](https://copr.fedorainfracloud.org/coprs/infiniti151/flatpak2spec/package/flatpak2spec/) [![Latest Release](https://img.shields.io/github/v/release/Infiniti151/flatpak2spec?style=for-the-badge&logo=github&color=orange)](https://github.com/Infiniti151/flatpak2spec/releases) [![License](https://img.shields.io/github/license/Infiniti151/flatpak2spec?style=for-the-badge&logo=spdx&logoColor=white&color=yellow&label=License)](https://github.com/Infiniti151/flatpak2spec/blob/main/LICENSE) [![SSH Signatures](https://img.shields.io/badge/SSH_Signatures-Verified-success?style=for-the-badge&logo=git&logoColor=white&color=purple&label=Signing)](#-pre-compiled-binaries-github-releases)
 
 `flatpak2spec` is a fast, robust Rust CLI tool designed to inspect Flatpak application repositories (or remote URLs) and automatically generate idiomatic Fedora RPM `.spec` files. By parsing Flatpak manifests (`JSON`/`YAML`), AppStream metadata, and build configurations, it bridges the gap between containerized app specs and native RPM packaging—optimizing the output out-of-the-box for Fedora Copr, GitHub Actions, and online CI pipelines.
 
@@ -45,16 +45,26 @@ The easiest way to install and stay updated on Fedora or Enterprise Linux system
 
 If you prefer not to install via package manager or are running a non-RPM Linux distribution, grab the latest pre-compiled release binary tarball and its corresponding `.sig` signature for your architecture (x86_64 or aarch64):
 
+1. **Download tarball and .sig**
+    ```bash
+    # Fetch the latest release tag dynamically
+    TAG=$(curl -sI https://github.com/Infiniti151/flatpak2spec/releases/latest | grep -i "^location:" | awk -F'/' '{print $NF}' | tr -d '\r')
+
+    # Download the tarball and signature for your machine architecture
+    curl -LO "https://github.com/Infiniti151/flatpak2spec/releases/download/${TAG}/flatpak2spec-${TAG#v}-$(uname -m).tar.gz"
+    curl -LO "https://github.com/Infiniti151/flatpak2spec/releases/download/${TAG}/flatpak2spec-${TAG#v}-$(uname -m).tar.gz.sig"
+    ```
+
 1. **Verify the SSH signature**
 
     Create a temporary allowed signers file in `/tmp` and verify the tarball signature:
 
     ```bash
-    # Add the signer's SSH public key to /tmp/allowed_signers
+    # Create an ephemeral allowed signers file for verification
     echo "43163551+Infiniti151@users.noreply.github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILTdQcJHfsMenp/k1A6ANxCqDJKvj3wp1d+7wSQCYwSU" > /tmp/allowed_signers
 
     # Verify the signature against the release archive
-    ssh-keygen -Y verify -f /tmp/allowed_signers -I 43163551+Infiniti151@users.noreply.github.com -n file flatpak2spec-*.tar.gz.sig < flatpak2spec-*.tar.gz
+    ssh-keygen -Y verify -f /tmp/allowed_signers -I 43163551+Infiniti151@users.noreply.github.com -n file -s flatpak2spec-*.tar.gz.sig < flatpak2spec-*.tar.gz
     ```
 
     *A successful output will read: `Good "file" signature for 43163551+Infiniti151@users.noreply.github.com with ED25519 key SHA256:5zeSTkU1qsZrkkCW4w2TKlD61J9eTihMPVx6lhgL92M`*
@@ -65,11 +75,12 @@ If you prefer not to install via package manager or are running a non-RPM Linux 
     tar -xzf flatpak2spec-*.tar.gz
     ```
 
-3. **Make executable and move to /usr/local/bin**
+3. **Make executable and move to `/usr/local/bin`**
 
     ```bash
     chmod +x flatpak2spec
     sudo mv flatpak2spec /usr/local/bin/
+    rm flatpak2spec*
     ```
 
 ### 🛠️ Manual Build (From Source)

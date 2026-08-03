@@ -78,26 +78,30 @@ install -D -m 0755 %{name} %{buildroot}%{_bindir}/%{name}
 
 %changelog
 * Mon Aug 03 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 0.3.0-1
-- - ci(release): integrate git-cliff for automated changelog generation
-- (manifest) Sanitize app_id and resolve external path references
-- (manifest) Sanitize app_id and resolve external path references
-- (manifest) Sanitize app_id and resolve external path references
-- (manifest) Sanitize app_id and resolve external path references
-- (deps) Bump the github-actions-dependencies group with 2 updates
-- (deps) Bump the github-actions-dependencies group with 2 updates
-- (deps) Bump the github-actions-dependencies group with 2 updates
-- (deps) Bump the github-actions-dependencies group with 2 updates
-- (deps) Bump the github-actions-dependencies group with 2 updates
-- ... see upstream for full release notes
+- Expand doc scanning targets to include AUTHORS, CONTRIBUTORS, and TODO
+- Resolve external Module::Path and Source::Path files dynamically
+- Sanitize app_id and resolve external path references
+- Strip .devel and .Devel suffixes during App ID sanitization
+- Perform exact stem and extension matching for docs and licenses
+- Collapse nested if blocks to satisfy Clippy lints cleanly
+- Add signature verification instructions
+- Fix formatting
+- Use git-cliff for automated changelog generation
+- Add SSH asset signing for release packages
+- ...see upstream for full release notes
 
 * Sat Aug 01 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 0.2.0-1
-- Added logic to handle git submodules
-- Improved forge handling by utilizing macros from forge-srpm-macros
-- Improved Python detection
+- Support Git submodule resolution and tracking
+- Improve forge integration via forge-srpm-macros
+- Enhance Python environment detection
 
 * Fri Jul 31 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 0.1.0-1
-- Initial release v0.1.0
-- Added remote and local repository parsing
-- Added manifest, AppStream, and changelog extraction
-- Added automatic architecture handling and noarch detection
+- Support remote and local repository parsing
+- Parse Flatpak manifests, AppStream metadata, and Meson configurations
+- Extract project changelogs to generate RPM %changelog entries
+- Detect release versions and format forge download URLs dynamically
+- Detect asset-only projects to assign BuildArch: noarch
+- Generate idiomatic Fedora RPM spec files with standard macros
+- Optimize output for Copr, GitHub Actions, and mock chroots
+- Initial release
 

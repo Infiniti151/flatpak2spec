@@ -172,7 +172,20 @@ jobs:
           DATE_STR=$(date "+%a %b %d %Y")
           CHLOG_HDR="* $DATE_STR Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - ${VERSION}-1"
 
-          RAW_ENTRIES=$(grep -E '^[[:space:]]*[-*]' release_notes.md | sed -E 's/^[[:space:]]*[-*][[:space:]]*/- /' | sed -E 's/\*//g' | sed -E 's/\([a-f0-9]{7,40}\)//g')
+          # 1. Extract bullet points
+          # 2. Strip standard bullet markers (- or *)
+          # 3. Strip bold markdown formatting (**)
+          # 4. Strip scope prefixes like (manifest) or (ci)
+          # 5. Strip git commit hashes (7 to 40 hex chars)
+          # 6. Normalize to standard RPM bullet format (- Entry)
+          # 7. Deduplicate identical back-to-back lines
+          RAW_ENTRIES=$(grep -E '^[[:space:]]*[-*]' release_notes.md \
+            | sed -E 's/^[[:space:]]*[-*][[:space:]]*//' \
+            | sed -E 's/\*\*//g' \
+            | sed -E 's/^\([^)]+\)[[:space:]]*//' \
+            | sed -E 's/\([a-f0-9]{7,40}\)//g' \
+            | sed -E 's/^[[:space:]]*/- /' \
+            | uniq)
 
           TOTAL_LINES=$(echo "$RAW_ENTRIES" | grep -c '^')
           if [ "$TOTAL_LINES" -gt 10 ]; then
@@ -188,7 +201,8 @@ jobs:
 
           EOF
 
-          sed -i '/%changelog/r changelog.tmp' "$SPEC_FILE"
+          # Append strictly at line-start ^%changelog$
+          sed -i '/^%changelog$/r changelog.tmp' "$SPEC_FILE"
           rm -f changelog.tmp
 
       - name: Download Artifacts
