@@ -1,7 +1,7 @@
 %global         debug_package %{nil}
 
 Name:           flatpak2spec
-Version:        0.2.0
+Version:        0.3.0
 Release:        1%{?dist}
 Summary:        CLI tool to generate Fedora-compliant RPM spec files from Flatpak repositories
 License:        GPL-3.0-or-later
@@ -25,6 +25,19 @@ and Fedora-compliant RPM spec files.
   metadata (.metainfo.xml), and Meson project configurations (meson.build).
 - Changelog & Release Notes Extraction: Automatically parses project changelogs
   and release notes to populate the RPM %changelog section cleanly.
+* Mon Aug 03 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 0.3.0-1
+- - ci(release): integrate git-cliff for automated changelog generation
+- (manifest) Sanitize app_id and resolve external path references
+- (manifest) Sanitize app_id and resolve external path references
+- (manifest) Sanitize app_id and resolve external path references
+- (manifest) Sanitize app_id and resolve external path references
+- (deps) Bump the github-actions-dependencies group with 2 updates
+- (deps) Bump the github-actions-dependencies group with 2 updates
+- (deps) Bump the github-actions-dependencies group with 2 updates
+- (deps) Bump the github-actions-dependencies group with 2 updates
+- (deps) Bump the github-actions-dependencies group with 2 updates
+- ... see upstream for full release notes
+
 * Sat Aug 01 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 0.2.0-1
 - Added logic to handle git submodules
 - Improved forge handling by utilizing macros from forge-srpm-macros
@@ -64,6 +77,19 @@ install -D -m 0755 %{name} %{buildroot}%{_bindir}/%{name}
 %{_bindir}/%{name}
 
 %changelog
+* Mon Aug 03 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 0.3.0-1
+- - ci(release): integrate git-cliff for automated changelog generation
+- (manifest) Sanitize app_id and resolve external path references
+- (manifest) Sanitize app_id and resolve external path references
+- (manifest) Sanitize app_id and resolve external path references
+- (manifest) Sanitize app_id and resolve external path references
+- (deps) Bump the github-actions-dependencies group with 2 updates
+- (deps) Bump the github-actions-dependencies group with 2 updates
+- (deps) Bump the github-actions-dependencies group with 2 updates
+- (deps) Bump the github-actions-dependencies group with 2 updates
+- (deps) Bump the github-actions-dependencies group with 2 updates
+- ... see upstream for full release notes
+
 * Sat Aug 01 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 0.2.0-1
 - Added logic to handle git submodules
 - Improved forge handling by utilizing macros from forge-srpm-macros
