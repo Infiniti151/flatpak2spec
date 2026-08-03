@@ -135,9 +135,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Sync Cargo.toml Version
+      - name: Sync Cargo.toml and Cargo.lock Version
         run: |
           sed -i -E "0,/^version = \"[^\"]*\"/s//version = \"$VERSION\"/" Cargo.toml
+          sed -i -E "/name = \"${BIN_NAME}\"/,/version =/ s/(version = \")[^\"]*(\")/\1${VERSION}\2/" Cargo.lock
 
       - name: Generate Latest Release Notes with git-cliff
         uses: orhun/git-cliff-action@5d3a6702d0a4ea1318aab88bd87a9d3df156eb0f # v2.13.1
@@ -258,6 +259,7 @@ jobs:
           files: |
             ${{ env.SPEC_FILE }}
             Cargo.toml
+            Cargo.lock
             CHANGELOG.md
           fail_on_self_push: false
 

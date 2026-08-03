@@ -98,10 +98,11 @@ impl RepoResolver {
     pub fn extract_repo_name(workspace_path: &Path, repo_url: &str) -> String {
         let clean_url = repo_url.trim_end_matches('/').trim_end_matches(".git");
 
-        if let Some(repo_name) = clean_url.split('/').last() {
-            if !repo_name.is_empty() && !repo_name.starts_with('.') {
-                return repo_name.to_string();
-            }
+        if let Some(repo_name) = clean_url.split('/').next_back()
+            && !repo_name.is_empty()
+            && !repo_name.starts_with('.')
+        {
+            return repo_name.to_string();
         }
 
         // Fallback to workspace directory name
@@ -117,18 +118,16 @@ impl RepoResolver {
         let mut url = String::new();
 
         // 1. Try reading git remote origin inside workspace_path
-        if workspace_path.join(".git").exists() {
-            if let Ok(output) = Command::new("git")
+        if workspace_path.join(".git").exists()
+            && let Ok(output) = Command::new("git")
                 .args(["remote", "get-url", "origin"])
                 .current_dir(workspace_path)
                 .output()
-            {
-                if output.status.success() {
-                    let remote = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                    if !remote.is_empty() {
-                        url = remote;
-                    }
-                }
+            && output.status.success()
+        {
+            let remote = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !remote.is_empty() {
+                url = remote;
             }
         }
 

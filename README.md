@@ -81,7 +81,7 @@ cd flatpak2spec
 cargo build --release
 ```
 
-The compiled binary will be available at target/release/flatpak2spec.
+The compiled binary will be available at target/release/flatpak2spec or $CARGO_TARGET_DIR/release/flatpak2spec (If you've set $CARGO_TARGET_DIR).
 
 ## 💻 Usage
 

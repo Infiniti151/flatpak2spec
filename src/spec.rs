@@ -27,7 +27,7 @@ impl SpecGenerator {
         let mut spec = String::new();
 
         // Resolve canonical web URL for forge-srpm-macros (%global forgeurl)
-        let canonical_url = RepoResolver::resolve_web_url(&workspace_path);
+        let canonical_url = RepoResolver::resolve_web_url(workspace_path);
 
         // 1. Preamble / Header block
         let header = HeaderSection::generate(

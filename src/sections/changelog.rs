@@ -43,23 +43,22 @@ impl ChangelogContext {
 
         let mut notes_found = false;
 
-        if let Some(xml) = metainfo_xml_content {
-            if let Some(notes) = extract_release_notes_from_xml(xml, &self.version) {
-                if !notes.is_empty() {
-                    const MAX_LINES: usize = 10;
-                    let is_truncated = notes.len() > MAX_LINES;
+        if let Some(xml) = metainfo_xml_content
+            && let Some(notes) = extract_release_notes_from_xml(xml, &self.version)
+            && !notes.is_empty()
+        {
+            const MAX_LINES: usize = 10;
+            let is_truncated = notes.len() > MAX_LINES;
 
-                    for line in notes.iter().take(MAX_LINES) {
-                        output.push_str(&format!("- {}\n", line));
-                    }
-
-                    if is_truncated {
-                        output.push_str("- ... see upstream for full release notes\n");
-                    }
-
-                    notes_found = true;
-                }
+            for line in notes.iter().take(MAX_LINES) {
+                output.push_str(&format!("- {}\n", line));
             }
+
+            if is_truncated {
+                output.push_str("- ... see upstream for full release notes\n");
+            }
+
+            notes_found = true;
         }
 
         // Fallback if no XML was provided or matching release notes were not found

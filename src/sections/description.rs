@@ -19,17 +19,17 @@ impl DescriptionSection {
 
     fn detect_description(workspace_path: &Path) -> Option<String> {
         // 1. AppStream MetaInfo XML primary <description>
-        if utils::has_metainfo_file(workspace_path) {
-            if let Some(desc) = Self::extract_from_metainfo(workspace_path) {
-                return Some(desc);
-            }
+        if utils::has_metainfo_file(workspace_path)
+            && let Some(desc) = Self::extract_from_metainfo(workspace_path)
+        {
+            return Some(desc);
         }
 
         // 2. .desktop Comment= key
-        if utils::has_desktop_file(workspace_path) {
-            if let Some(comment) = Self::extract_from_desktop(workspace_path) {
-                return Some(comment);
-            }
+        if utils::has_desktop_file(workspace_path)
+            && let Some(comment) = Self::extract_from_desktop(workspace_path)
+        {
+            return Some(comment);
         }
 
         // 3. First paragraph of README.md
@@ -63,12 +63,12 @@ impl DescriptionSection {
         let files = utils::find_matching_files(workspace_path, &[".desktop"]);
 
         for path in files {
-            if let Ok(content) = fs::read_to_string(&path) {
-                if let Some(caps) = comment_re.captures(&content) {
-                    let comment = caps[1].trim();
-                    if !comment.is_empty() {
-                        return Some(comment.to_string());
-                    }
+            if let Ok(content) = fs::read_to_string(&path)
+                && let Some(caps) = comment_re.captures(&content)
+            {
+                let comment = caps[1].trim();
+                if !comment.is_empty() {
+                    return Some(comment.to_string());
                 }
             }
         }

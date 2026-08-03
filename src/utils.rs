@@ -245,10 +245,10 @@ pub fn format_appstream_node(node: Node) -> String {
 pub fn collect_node_text(node: Node) -> String {
     let mut text_parts = Vec::new();
     for desc in node.descendants() {
-        if desc.is_text() {
-            if let Some(txt) = desc.text() {
-                text_parts.push(txt);
-            }
+        if desc.is_text()
+            && let Some(txt) = desc.text()
+        {
+            text_parts.push(txt);
         }
     }
     let combined = text_parts.join("");
@@ -261,12 +261,12 @@ pub fn find_and_extract_regex(dir: &Path, patterns: &[&str], re: &Regex) -> Opti
     let matching_files = find_matching_files(dir, patterns);
 
     for path in matching_files {
-        if let Ok(content) = fs::read_to_string(&path) {
-            if let Some(caps) = re.captures(&content) {
-                let val = caps[1].trim().to_string();
-                if !val.is_empty() {
-                    return Some(val);
-                }
+        if let Ok(content) = fs::read_to_string(&path)
+            && let Some(caps) = re.captures(&content)
+        {
+            let val = caps[1].trim().to_string();
+            if !val.is_empty() {
+                return Some(val);
             }
         }
     }

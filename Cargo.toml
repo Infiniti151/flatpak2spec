@@ -5,6 +5,9 @@ edition = "2024"
 authors = ["Infiniti151"]
 license = "GPL-3.0-or-later"
 
+[profile.dev]
+debug = 1
+
 [profile.release]
 opt-level = "z"
 lto = true

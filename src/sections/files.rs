@@ -4,9 +4,9 @@
 use crate::manifest::FlatpakManifest;
 use crate::meson::MesonProject;
 use crate::utils::{
-    check_file_extension, detect_systemd_units, find_matching_files, has_desktop_file,
-    has_metainfo_file,
+    check_file_extension, detect_systemd_units, has_desktop_file, has_metainfo_file,
 };
+use std::collections::HashSet;
 use std::path::Path;
 
 #[derive(Debug, Clone, Default)]
@@ -108,23 +108,50 @@ fn format_binary_macro(binary: &str, project_name: &str) -> String {
 
 /// Scans the workspace root for standard license and documentation files.
 fn scan_docs_and_licenses(workspace: &Path) -> (Vec<String>, Vec<String>) {
-    let patterns = ["license", "copying", "readme", "news", "changelog"];
-    let matching_paths = find_matching_files(workspace, &patterns);
+    let license_stems: HashSet<&str> = ["license", "copying"].into_iter().collect();
+
+    let doc_stems: HashSet<&str> = [
+        "readme",
+        "changelog",
+        "news",
+        "authors",
+        "contributors",
+        "todo",
+    ]
+    .into_iter()
+    .collect();
+
+    let allowed_extensions: HashSet<&str> =
+        ["", "md", "rst", "txt", "markdown"].into_iter().collect();
 
     let mut docs = Vec::new();
     let mut licenses = Vec::new();
 
-    for path in matching_paths {
-        if path.parent() == Some(workspace) {
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                let upper = name.to_uppercase();
-                if upper.starts_with("LICENSE") || upper.starts_with("COPYING") {
-                    licenses.push(name.to_string());
-                } else if upper.starts_with("README")
-                    || upper.starts_with("NEWS")
-                    || upper.starts_with("CHANGELOG")
+    if let Ok(entries) = std::fs::read_dir(workspace) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+
+            if path.is_file() {
+                let stem = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_lowercase();
+
+                let ext = path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("")
+                    .to_lowercase();
+
+                if allowed_extensions.contains(ext.as_str())
+                    && let Some(file_name) = path.file_name().and_then(|n| n.to_str())
                 {
-                    docs.push(name.to_string());
+                    if license_stems.contains(stem.as_str()) {
+                        licenses.push(file_name.to_string());
+                    } else if doc_stems.contains(stem.as_str()) {
+                        docs.push(file_name.to_string());
+                    }
                 }
             }
         }

@@ -112,7 +112,7 @@ impl MesonProject {
                 let clean_name = if raw_name.contains('.') {
                     raw_name
                         .split('.')
-                        .last()
+                        .next_back()
                         .unwrap_or(raw_name)
                         .to_lowercase()
                 } else {
@@ -179,22 +179,20 @@ impl MesonProject {
         // 2. Custom targets
         let custom_target_re =
             Regex::new(r#"(?s)custom_target\s*\(\s*(?:['"]([^'"]+)['"]\s*,\s*)?(.*?)\)"#).unwrap();
-        let output_re = Regex::new(r#"output\s*:\s*(?:\[\s*)?['"]([^'"]+)['"]"#).unwrap();
+        let output_str_re = Regex::new(r#"output\s*:\s*(?:\[\s*)?['"]([^'"]+)['"]"#).unwrap();
 
         for cap in custom_target_re.captures_iter(content) {
             let block = &cap[2];
 
             // Catch custom targets with `install: true` OR `install_dir`
-            let is_installed = block.contains("install : true") || block.contains("install: true");
-            let has_bindir = block.contains("bindir");
+            let is_installed = block.contains("install : true")
+                || block.contains("install: true")
+                || block.contains("install_dir");
 
-            if is_installed || has_bindir {
-                if let Some(out_cap) = output_re.captures(block) {
-                    self.installed_executables.insert(out_cap[1].to_string());
-                } else if let Some(target_name) = cap.get(1) {
-                    // Fallback to target name if output argument wasn't matched cleanly
-                    self.installed_executables
-                        .insert(target_name.as_str().to_string());
+            if is_installed && let Some(out_cap) = output_str_re.captures(block) {
+                let out_name = out_cap[1].trim();
+                if out_name != "@OUTPUT@" {
+                    self.installed_executables.insert(out_name.to_string());
                 }
             }
         }
@@ -331,12 +329,12 @@ impl MesonProject {
         let files = utils::find_matching_files(workspace_path, &["metainfo.xml", "appdata.xml"]);
 
         for path in files {
-            if let Ok(content) = fs::read_to_string(path) {
-                if let Some(caps) = re.captures(&content) {
-                    let lic = caps[1].trim().to_string();
-                    if !lic.is_empty() {
-                        return Some(lic);
-                    }
+            if let Ok(content) = fs::read_to_string(path)
+                && let Some(caps) = re.captures(&content)
+            {
+                let lic = caps[1].trim().to_string();
+                if !lic.is_empty() {
+                    return Some(lic);
                 }
             }
         }
@@ -366,13 +364,13 @@ impl MesonProject {
         }
 
         let subprojects_dir = workspace_path.join("subprojects");
-        if subprojects_dir.is_dir() {
-            if let Ok(entries) = fs::read_dir(subprojects_dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir() && path.join("Cargo.toml").exists() {
-                        return true;
-                    }
+        if subprojects_dir.is_dir()
+            && let Ok(entries) = fs::read_dir(subprojects_dir)
+        {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() && path.join("Cargo.toml").exists() {
+                    return true;
                 }
             }
         }

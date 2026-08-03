@@ -18,11 +18,14 @@ impl HeaderSection {
         canonical_url: &str,
         bug_url: Option<&str>,
     ) -> String {
-        let raw_app_id = manifest.id.as_deref().unwrap_or("app");
+        let app_id = manifest
+            .resolve_app_id(workspace_path)
+            .unwrap_or_else(|| "app".to_string());
 
-        let fallback_name = raw_app_id.split('.').last().unwrap_or("app").to_string();
-
-        let name = meson.name.clone().unwrap_or(fallback_name);
+        let name = meson
+            .name
+            .clone()
+            .unwrap_or_else(|| app_id.split('.').next_back().unwrap_or("app").to_string());
 
         let (version, tag_prefix) = Self::detect_version_and_prefix(workspace_path)
             .unwrap_or_else(|| ("1.0.0".to_string(), "".to_string()));
@@ -61,7 +64,7 @@ impl HeaderSection {
              %forgemeta\n\n\
              URL:            %{{forgeurl}}\n\
              Source0:        %{{forgesource}}",
-            raw_app_id,
+            app_id,
             canonical_url,
             tag_value,
             name,
@@ -78,23 +81,21 @@ impl HeaderSection {
 
     pub fn detect_version_and_prefix(workspace_path: &Path) -> Option<(String, String)> {
         // 1. Try Git tags first
-        if workspace_path.join(".git").exists() {
-            if let Ok(output) = Command::new("git")
+        if workspace_path.join(".git").exists()
+            && let Ok(output) = Command::new("git")
                 .args(["tag", "-l", "--sort=-v:refname"])
                 .current_dir(workspace_path)
                 .output()
+            && output.status.success()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Some(latest_tag) = stdout.lines().next().map(|s| s.trim())
+                && let Some(idx) = latest_tag.find(|c: char| c.is_ascii_digit())
             {
-                if output.status.success() {
-                    let stdout = String::from_utf8_lossy(&output.stdout);
-                    if let Some(latest_tag) = stdout.lines().next().map(|s| s.trim()) {
-                        if let Some(idx) = latest_tag.find(|c: char| c.is_ascii_digit()) {
-                            let prefix = latest_tag[..idx].to_string();
-                            let version = latest_tag[idx..].to_string();
-                            if !version.is_empty() {
-                                return Some((version, prefix));
-                            }
-                        }
-                    }
+                let prefix = latest_tag[..idx].to_string();
+                let version = latest_tag[idx..].to_string();
+                if !version.is_empty() {
+                    return Some((version, prefix));
                 }
             }
         }

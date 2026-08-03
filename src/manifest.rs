@@ -7,10 +7,9 @@ use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 
-#[derive(Debug, Clone, serde::Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct FlatpakManifest {
-    // Accepts "id", "app-id", or "app_id" seamlessly
     #[serde(alias = "app-id", alias = "app_id")]
     pub id: Option<String>,
 
@@ -29,12 +28,6 @@ pub enum Module {
     Detail(ModuleDetail),
 }
 
-impl Default for Module {
-    fn default() -> Self {
-        Module::Path(String::new())
-    }
-}
-
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct ModuleDetail {
@@ -47,19 +40,79 @@ pub struct ModuleDetail {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum Source {
-    /// External source file reference (e.g. "cargo-sources.json")
     Path(String),
-    /// Structured source object (e.g. {"type": "dir", "path": "."})
     Detail(SourceDetail),
+}
+
+impl Module {
+    /// Resolves external file paths or returns the inline module details.
+    pub fn resolve(&self, base_dir: &Path) -> Result<ModuleDetail> {
+        match self {
+            Module::Detail(detail) => Ok(detail.clone()),
+            Module::Path(path_str) => {
+                let file_path = base_dir.join(path_str);
+                let content = fs::read_to_string(&file_path).with_context(|| {
+                    format!(
+                        "Failed to read external module file: {}",
+                        file_path.display()
+                    )
+                })?;
+
+                let is_json = file_path.extension().and_then(|s| s.to_str()) == Some("json");
+                let detail: ModuleDetail = if is_json {
+                    serde_json::from_str(&content).with_context(|| {
+                        format!("Failed to parse JSON module file: {}", file_path.display())
+                    })?
+                } else {
+                    serde_norway::from_str(&content).with_context(|| {
+                        format!("Failed to parse YAML module file: {}", file_path.display())
+                    })?
+                };
+
+                Ok(detail)
+            }
+        }
+    }
+}
+
+impl Source {
+    /// Resolves external file paths or returns the inline source details.
+    pub fn resolve(&self, base_dir: &Path) -> Result<SourceDetail> {
+        match self {
+            Source::Detail(detail) => Ok(detail.clone()),
+            Source::Path(path_str) => {
+                let file_path = base_dir.join(path_str);
+                let content = fs::read_to_string(&file_path).with_context(|| {
+                    format!(
+                        "Failed to read external source file: {}",
+                        file_path.display()
+                    )
+                })?;
+
+                let is_json = file_path.extension().and_then(|s| s.to_str()) == Some("json");
+                let detail: SourceDetail = if is_json {
+                    serde_json::from_str(&content).with_context(|| {
+                        format!("Failed to parse JSON source file: {}", file_path.display())
+                    })?
+                } else {
+                    serde_norway::from_str(&content).with_context(|| {
+                        format!("Failed to parse YAML source file: {}", file_path.display())
+                    })?
+                };
+
+                Ok(detail)
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum SourceDetail {
     #[serde(rename = "archive")]
-    Archive { url: String, sha256: Option<String> },
+    Archive { url: String },
     #[serde(rename = "git")]
-    Git { url: String, tag: Option<String> },
+    Git { url: String },
     #[serde(rename = "dir")]
     Dir { path: String },
     #[default]
@@ -69,51 +122,47 @@ pub enum SourceDetail {
 
 impl FlatpakManifest {
     pub fn load_from_workspace(workspace_path: &Path) -> Result<Self> {
-        // Try locating an actual manifest file first
-        let manifest = match find_manifest_file(workspace_path) {
+        let mut manifest = match find_manifest_file(workspace_path) {
             Ok(manifest_path) => {
                 let content = fs::read_to_string(&manifest_path).with_context(|| {
                     format!("Failed to read manifest file: {}", manifest_path.display())
                 })?;
 
-                if manifest_path.extension().and_then(|s| s.to_str()) == Some("json") {
-                    serde_json::from_str(&content).with_context(|| {
-                        format!("Failed to parse JSON manifest: {}", manifest_path.display())
-                    })?
-                } else {
-                    serde_norway::from_str(&content).with_context(|| {
-                        format!("Failed to parse YAML manifest: {}", manifest_path.display())
-                    })?
-                }
+                let parsed: FlatpakManifest =
+                    if manifest_path.extension().and_then(|s| s.to_str()) == Some("json") {
+                        serde_json::from_str(&content).with_context(|| {
+                            format!("Failed to parse JSON manifest: {}", manifest_path.display())
+                        })?
+                    } else {
+                        serde_norway::from_str(&content).with_context(|| {
+                            format!("Failed to parse YAML manifest: {}", manifest_path.display())
+                        })?
+                    };
+                parsed
             }
             Err(_) => {
-                // Fallback: No manifest file was found, synthesize a default manifest from repo files
                 let mut synthetic = FlatpakManifest::default();
                 synthetic.id = synthetic.resolve_app_id(workspace_path);
-                // Force buildsystem to meson since meson.build presence is validated right after
                 synthetic.buildsystem = Some("meson".to_string());
 
-                // If snapcraft.yaml exists, try extracting command/name from it
                 if let Ok(content) = fs::read_to_string(workspace_path.join("snap/snapcraft.yaml"))
+                    && let Ok(val) = serde_norway::from_str::<serde_json::Value>(&content)
+                    && synthetic.command.is_none()
                 {
-                    if let Ok(val) = serde_norway::from_str::<serde_json::Value>(&content) {
-                        if synthetic.command.is_none() {
-                            synthetic.command =
-                                val.get("name").and_then(|v| v.as_str()).map(String::from);
-                        }
-                    }
+                    synthetic.command = val.get("name").and_then(|v| v.as_str()).map(String::from);
                 }
 
                 synthetic
             }
         };
 
+        manifest.sanitize_internal_id();
+
         manifest.validate_meson(workspace_path)?;
 
         Ok(manifest)
     }
 
-    /// Takes 0 arguments for backward compatibility. Returns the raw manifest App ID if set.
     pub fn get_app_id(&self) -> Option<&str> {
         self.id.as_deref()
     }
@@ -123,31 +172,30 @@ impl FlatpakManifest {
     /// 2. Reverse-DNS AppStream metadata files (`*.metainfo.xml`, `*.appdata.xml`)
     /// 3. `app_id` / `application_id` declarations inside `meson.build`
     pub fn resolve_app_id(&self, workspace_path: &Path) -> Option<String> {
-        if let Some(id) = self.get_app_id() {
-            if !id.is_empty() {
-                return Some(id.to_string());
-            }
-        }
-
-        if let Some(app_id) = find_app_id_from_metainfo(workspace_path) {
-            return Some(app_id);
-        }
-
-        if let Some(app_id) = find_app_id_from_meson(workspace_path) {
-            return Some(app_id);
-        }
-
-        None
+        self.get_app_id()
+            .filter(|id| !id.is_empty())
+            .map(String::from)
+            .or_else(|| find_app_id_from_metainfo(workspace_path))
+            .or_else(|| find_app_id_from_meson(workspace_path))
+            .map(|id| Self::sanitize_app_id_str(&id).to_string())
     }
 
-    /// Access basic metadata details to ensure fields are inspected
-    pub fn get_target_info(&self) -> (Option<&str>, Option<&str>, Option<&str>, Option<&str>) {
-        (
-            self.runtime.as_deref(),
-            self.runtime_version.as_deref(),
-            self.sdk.as_deref(),
-            self.command.as_deref(),
-        )
+    fn sanitize_internal_id(&mut self) {
+        if let Some(ref mut id) = self.id {
+            let sanitized = Self::sanitize_app_id_str(id);
+            if sanitized != id {
+                *id = sanitized.to_string();
+            }
+        }
+    }
+
+    fn sanitize_app_id_str(id: &str) -> &str {
+        let trimmed = id.trim();
+
+        trimmed
+            .strip_suffix(".Devel")
+            .or_else(|| trimmed.strip_suffix(".devel"))
+            .unwrap_or(trimmed)
     }
 
     pub fn validate_meson(&self, workspace_path: &Path) -> Result<()> {
@@ -159,21 +207,18 @@ impl FlatpakManifest {
             );
         }
 
-        // 1. If manifest top-level buildsystem is meson, or it was synthesized as meson
-        if let Some(ref bs) = self.buildsystem {
-            if bs.to_lowercase() == "meson" {
-                return Ok(());
-            }
+        if let Some(ref bs) = self.buildsystem
+            && bs.to_lowercase() == "meson"
+        {
+            return Ok(());
         }
 
-        // 2. Search modules array if present
         if let Some(ref modules) = self.modules {
             let resolved_id = self.resolve_app_id(workspace_path);
-            if has_meson_app_module(modules, resolved_id.as_deref()) {
+            if has_meson_app_module(modules, resolved_id.as_deref(), workspace_path) {
                 return Ok(());
             }
         } else {
-            // 3. If modules is None/empty, presence of root meson.build is sufficient
             return Ok(());
         }
 
@@ -184,7 +229,6 @@ impl FlatpakManifest {
 }
 
 fn find_manifest_file(workspace_path: &Path) -> Result<std::path::PathBuf> {
-    // 1. First search workspace root
     let candidates = utils::find_matching_files(workspace_path, &[".json", ".yaml", ".yml"]);
 
     for path in candidates {
@@ -193,7 +237,6 @@ fn find_manifest_file(workspace_path: &Path) -> Result<std::path::PathBuf> {
         }
     }
 
-    // 2. Search common packaging subdirectories
     let subdirs = [
         "build-aux",
         "flatpak",
@@ -224,9 +267,7 @@ fn is_likely_manifest(path: &Path) -> bool {
     if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
         let name_lower = filename.to_lowercase();
 
-        // Match reverse-DNS naming (e.g., io.github.nacho.mundi.json) or files containing "manifest"
         if filename.matches('.').count() >= 2 || name_lower.contains("manifest") {
-            // Ignore common non-manifest YAML/JSON files like snapcraft, CI configs, or translation configs
             if name_lower.contains("snapcraft")
                 || name_lower.contains("ci")
                 || name_lower.starts_with('.')
@@ -239,68 +280,74 @@ fn is_likely_manifest(path: &Path) -> bool {
     false
 }
 
-fn has_meson_app_module(modules: &[Module], app_id: Option<&str>) -> bool {
+fn has_meson_app_module(modules: &[Module], app_id: Option<&str>, workspace_path: &Path) -> bool {
     let total_modules = modules.len();
 
     for module in modules {
-        if let Module::Detail(detail) = module {
-            let bs = detail.buildsystem.as_deref().unwrap_or("meson");
+        let Ok(detail) = module.resolve(workspace_path) else {
+            continue;
+        };
 
-            // If this module is Meson-based AND identified as the main application module
-            if bs.to_lowercase() == "meson" && is_main_app_module(detail, app_id, total_modules) {
-                return true;
-            }
+        let bs = detail.buildsystem.as_deref().unwrap_or("meson");
 
-            // Recursively search child modules (e.g. sub-modules array)
-            if let Some(ref child_modules) = detail.modules {
-                if has_meson_app_module(child_modules, app_id) {
-                    return true;
-                }
-            }
+        if bs.to_lowercase() == "meson"
+            && is_main_app_module(&detail, app_id, total_modules, workspace_path)
+        {
+            return true;
+        }
+
+        if let Some(ref child_modules) = detail.modules
+            && has_meson_app_module(child_modules, app_id, workspace_path)
+        {
+            return true;
         }
     }
 
     false
 }
 
-fn is_main_app_module(module: &ModuleDetail, app_id: Option<&str>, total_modules: usize) -> bool {
+fn is_main_app_module(
+    module: &ModuleDetail,
+    app_id: Option<&str>,
+    total_modules: usize,
+    workspace_path: &Path,
+) -> bool {
     let id_lower = app_id.map(|s| s.to_lowercase());
     let name_lower = module.name.to_lowercase();
 
-    // 1. Exact or partial match against App ID (e.g., "missioncenter" matches "io.missioncenter.MissionCenter")
     if let Some(ref id) = id_lower {
-        let last_segment = id.split('.').last().unwrap_or(id).to_lowercase();
+        let last_segment = id.split('.').next_back().unwrap_or(id).to_lowercase();
         if name_lower == *id || name_lower == last_segment {
             return true;
         }
     }
 
-    // 2. Check sources for local directory root ("." or "..")
     if let Some(ref sources) = module.sources {
         for source in sources {
-            if let Source::Detail(detail) = source {
-                match detail {
-                    SourceDetail::Dir { path } => {
-                        if path == "." || path == "./" || path == ".." || path == "../" {
+            let Ok(detail) = source.resolve(workspace_path) else {
+                continue;
+            };
+
+            match detail {
+                SourceDetail::Dir { path } => {
+                    if path == "." || path == "./" || path == ".." || path == "../" {
+                        return true;
+                    }
+                }
+                SourceDetail::Archive { url } | SourceDetail::Git { url } => {
+                    if let Some(ref id) = id_lower {
+                        let last_segment = id.split('.').next_back().unwrap_or(id).to_lowercase();
+                        let url_lower = url.to_lowercase();
+                        if url_lower.contains(id) || url_lower.contains(&last_segment) {
                             return true;
                         }
                     }
-                    SourceDetail::Archive { url, .. } | SourceDetail::Git { url, .. } => {
-                        if let Some(ref id) = id_lower {
-                            let last_segment = id.split('.').last().unwrap_or(id).to_lowercase();
-                            let url_lower = url.to_lowercase();
-                            if url_lower.contains(id) || url_lower.contains(&last_segment) {
-                                return true;
-                            }
-                        }
-                    }
-                    SourceDetail::Other => {}
                 }
+                SourceDetail::Other => {}
             }
         }
     }
 
-    // 3. Fallback: single module manifests default to main app
     if total_modules == 1 {
         return true;
     }
@@ -336,12 +383,12 @@ fn find_app_id_from_meson(workspace_path: &Path) -> Option<String> {
         if let Ok(content) = fs::read_to_string(meson_path) {
             for line in content.lines() {
                 let trimmed = line.trim();
-                if trimmed.starts_with("app_id") || trimmed.starts_with("application_id") {
-                    if let Some(val) = trimmed.split('=').nth(1) {
-                        let clean = val.trim().trim_matches('\'').trim_matches('"');
-                        if clean.matches('.').count() >= 2 {
-                            return Some(clean.to_string());
-                        }
+                if (trimmed.starts_with("app_id") || trimmed.starts_with("application_id"))
+                    && let Some(val) = trimmed.split('=').nth(1)
+                {
+                    let clean = val.trim().trim_matches('\'').trim_matches('"');
+                    if clean.matches('.').count() >= 2 {
+                        return Some(clean.to_string());
                     }
                 }
             }

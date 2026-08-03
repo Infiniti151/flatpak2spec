@@ -125,8 +125,7 @@ fn run() -> Result<()> {
     let app_name = meson_proj.name.clone().unwrap_or_else(|| {
         manifest
             .get_app_id()
-            .as_deref()
-            .and_then(|id| id.rsplit('.').next())
+            .and_then(|id| id.split('.').next_back())
             .unwrap_or("app")
             .to_string()
     });

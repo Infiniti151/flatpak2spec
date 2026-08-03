@@ -39,7 +39,7 @@ commit_parsers = [
     { message = "^[\\-*]?[[:space:]]*doc", group = "📚 Documentation" },
     { message = "^[\\-*]?[[:space:]]*build", group = "📦 Build System" },
     { message = "^[\\-*]?[[:space:]]*ci", group = "⚙️ Continuous Integration" },
-    { message = "^[\\-*]?[[:space:]]*chore\\(release\\)", skip = true },            # Hide automated release/version bump commits
+    { message = ".*chore\\(release\\)", skip = true },
     { message = "^[\\-*]?[[:space:]]*chore\\(deps\\)", group = "🛠️ Dependencies" },
     { message = "^[\\-*]?[[:space:]]*chore", group = "🧹 Chores" },
     { message = "^[\\-*]?[[:space:]]*revert", group = "◀️ Reverts" },
