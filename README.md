@@ -55,19 +55,46 @@ If you prefer not to install via package manager or are running a non-RPM Linux 
     curl -LO "https://github.com/Infiniti151/flatpak2spec/releases/download/${TAG}/flatpak2spec-${TAG#v}-$(uname -m).tar.gz.sig"
     ```
 
-1. **Verify the SSH signature**
+1. **Verification**
 
-    Create a temporary allowed signers file in `/tmp` and verify the tarball signature:
+    - Verify SSH signature
+        ```bash
+        # Create an ephemeral allowed signers file for verification
+        echo "43163551+Infiniti151@users.noreply.github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILTdQcJHfsMenp/k1A6ANxCqDJKvj3wp1d+7wSQCYwSU" > /tmp/allowed_signers
 
-    ```bash
-    # Create an ephemeral allowed signers file for verification
-    echo "43163551+Infiniti151@users.noreply.github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILTdQcJHfsMenp/k1A6ANxCqDJKvj3wp1d+7wSQCYwSU" > /tmp/allowed_signers
+        # Verify the signature against the release archive
+        ssh-keygen -Y verify -f /tmp/allowed_signers -I 43163551+Infiniti151@users.noreply.github.com -n file -s flatpak2spec-*.tar.gz.sig < flatpak2spec-*.tar.gz
+        ```
 
-    # Verify the signature against the release archive
-    ssh-keygen -Y verify -f /tmp/allowed_signers -I 43163551+Infiniti151@users.noreply.github.com -n file -s flatpak2spec-*.tar.gz.sig < flatpak2spec-*.tar.gz
-    ```
+        *A successful output will read:*
+        ```bash
+        Good "file" signature for 43163551+Infiniti151@users.noreply.github.com with ED25519 key SHA256:5zeSTkU1qsZrkkCW4w2TKlD61J9eTihMPVx6lhgL92M`
+        ```
 
-    *A successful output will read: `Good "file" signature for 43163551+Infiniti151@users.noreply.github.com with ED25519 key SHA256:5zeSTkU1qsZrkkCW4w2TKlD61J9eTihMPVx6lhgL92M`*
+    - Verify build attestation (needs GitHub CLI installed)
+        ```bash
+        gh attestation verify --owner Infiniti151 flatpak2spec-*.tar.gz
+        ```
+
+        *A successful output will read:*
+        ```bash
+        The following policy criteria will be enforced:
+        - Predicate type must match:................ https://slsa.dev/provenance/v1
+        - Source Repository Owner URI must match:... https://github.com/Infiniti151
+        - Subject Alternative Name must match regex: (?i)^https://github\.com/Infiniti151/
+        - OIDC Issuer must match:................... https://token.actions.githubusercontent.com
+
+        ✓ Verification succeeded!
+
+        The following 1 attestation matched the policy criteria
+
+        - Attestation #1
+        - Build repo:..... Infiniti151/flatpak2spec
+        - Build workflow:. .github/workflows/release.yml@refs/heads/main
+        - Signer repo:.... Infiniti151/flatpak2spec
+        - Signer workflow: .github/workflows/release.yml@refs/heads/main
+
+        ```
 
 2. **Extract the release tarball**
 
@@ -111,13 +138,13 @@ Options:
 
 ## 📄 Generated Spec File
 
-Command:
+*Command:*
 
 ```bash
 flatpak2spec -b https://github.com/Infiniti151/flatpak-apps -p Infiniti151 -e 43163551+Infiniti151@users.noreply.github.com -r https://gitlab.com/mission-center-devs/mission-center
 ```
 
-Output:
+*Output:*
 ```
 %global         app_id        io.missioncenter.MissionCenter
 %global         forgeurl      https://gitlab.com/mission-center-devs/mission-center
@@ -242,6 +269,7 @@ glib-compile-schemas --dry-run --strict %{buildroot}%{_datadir}/glib-2.0/schemas
 ```
 flatpak2spec/
 ├── Cargo.toml                      # Project metadata, binary definition, and crate dependencies
+├── cliff.toml                      # git-cliff changelog generator config
 ├── .github/
 │   └── workflows/
 │       └── release.yml             # CI/CD workflow for automated building, attestation, and releases
