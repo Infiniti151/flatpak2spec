@@ -217,65 +217,14 @@ jobs:
           sudo apt-get install -y expect
 
       - name: Sign Tarball Archives with SSH Key
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.RELEASE_SSH_PRIVATE_KEY }}
-          SSH_PASSPHRASE: ${{ secrets.RELEASE_SSH_PASSPHRASE }}
-          SSH_AUTH_SOCK: "" # Prevents ssh-agent interference
-        run: |
-          set -e
-
-          if [[ -z "$SSH_PRIVATE_KEY" || -z "$SSH_PASSPHRASE" ]]; then
-            echo "::error::RELEASE_SSH_PRIVATE_KEY or RELEASE_SSH_PASSPHRASE secret is missing!"
-            exit 1
-          fi
-
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/release_key
-          chmod 600 ~/.ssh/release_key
-
-          trap 'rm -f ~/.ssh/release_key' EXIT
-
-          shopt -s nullglob
-          tarballs=(release-assets/*.tar.gz)
-
-          if [ ${#tarballs[@]} -eq 0 ]; then
-            echo "::error::No tarballs found in release-assets/!"
-            exit 1
-          fi
-
-          for tarball in "${tarballs[@]}"; do
-            echo "Signing $tarball..."
-
-            export CURRENT_TARBALL="$tarball"
-
-            expect -c '
-              spawn ssh-keygen -Y sign -f $env(HOME)/.ssh/release_key -n file $env(CURRENT_TARBALL)
-              expect {
-                "Enter passphrase*" {
-                  send "$env(SSH_PASSPHRASE)\r"
-                  exp_continue
-                }
-                timeout {
-                  send_user "\n::error file=$env(CURRENT_TARBALL),title=Signing Timeout::Timed out waiting for passphrase prompt while signing $env(CURRENT_TARBALL)\n"
-                  exit 1
-                }
-                eof
-              }
-
-              # Capture the exit status of ssh-keygen
-              catch wait result
-              set exit_code [lindex $result 3]
-
-              if { $exit_code != 0 } {
-                send_user "\n::error file=$env(CURRENT_TARBALL),title=Signing Failed::ssh-keygen failed with exit code $exit_code for $env(CURRENT_TARBALL)\n"
-                exit $exit_code
-              }
-            '
-          done
+        uses: Infiniti151/ssh-asset-signer@b86ddbf3cd4962184e36c45952ecf2a0403529f6 # v1
+        with:
+          private-key: ${{ secrets.RELEASE_SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.RELEASE_SSH_PASSPHRASE }}
+          files: release-assets/*.tar.gz
 
       - name: Attest tarball archives
-        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: release-assets/*.tar.gz
 
