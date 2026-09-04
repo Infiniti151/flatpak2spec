@@ -8,9 +8,10 @@ body = """
     ## [Unreleased]
 {% endif -%}
 
-{% for group, commits in commits | group_by(attribute="group") %}
-    ### {{ group | upper_first }}
-    {%- for scope, scope_commits in commits | group_by(attribute="scope") %}
+{% for entry in commits | commit_groups(groups=commit_parsers_groups) %}
+    {%- if entry.commits %}
+    ### {{ entry.group | upper_first }}
+    {%- for scope, scope_commits in entry.commits | group_by(attribute="scope") %}
         {%- for commit in scope_commits | unique(attribute="message") %}
             - {% if commit.scope %}(**{{ commit.scope }}**) {% endif -%}
             {%- if commit.message is starting_with("ci(deps)") -%}
@@ -20,6 +21,7 @@ body = """
             {%- endif -%}
         {%- endfor %}
     {%- endfor %}
+    {%- endif %}
 {% endfor %}
 """
 trim = true
