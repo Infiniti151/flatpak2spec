@@ -180,6 +180,8 @@ impl RepoResolver {
         Ok(workspace_dir)
     }
 
+    /// Extracts the repository name from a Git URL or local workspace directory path.
+    /// Preserves exact upstream casing and formatting (e.g., "NetPeek", "mission-center").
     pub fn extract_repo_name(workspace_path: &Path, repo_url: &str) -> String {
         let clean_url = repo_url.trim_end_matches('/').trim_end_matches(".git");
 
