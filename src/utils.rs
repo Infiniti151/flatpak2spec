@@ -6,6 +6,7 @@ use regex::Regex;
 use roxmltree::Node;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use crate::manifest::FlatpakManifest;
 
@@ -268,6 +269,136 @@ pub fn find_and_extract_regex(dir: &Path, patterns: &[&str], re: &Regex) -> Opti
             if !val.is_empty() {
                 return Some(val);
             }
+        }
+    }
+
+    None
+}
+
+/// Queries Flathub AppStream API to detect the latest released version,
+/// cross-references with local or remote Git tags to find the tag prefix (e.g. "v"),
+/// and falls back to Git tags if Flathub info is unavailable.
+pub fn detect_version_and_prefix(workspace_path: &Path, app_id: &str) -> Option<(String, String)> {
+    // Collect git tags if repository exists
+    let git_tags: Vec<String> = if workspace_path.join(".git").exists() {
+        // 1. Try to fetch tags locally first
+        let mut tags = Command::new("git")
+            .args(["tag", "-l", "--sort=-v:refname"])
+            .current_dir(workspace_path)
+            .output()
+            .ok()
+            .and_then(|output| {
+                if output.status.success() {
+                    let lines: Vec<String> = String::from_utf8_lossy(&output.stdout)
+                        .lines()
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    if lines.is_empty() { None } else { Some(lines) }
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+
+        // 2. If local tags are empty (e.g., due to a shallow clone), query remote tags natively
+        if tags.is_empty() {
+            tags = Command::new("git")
+                .args([
+                    "ls-remote",
+                    "--tags",
+                    "--refs",
+                    "--sort=-v:refname",
+                    "origin",
+                ])
+                .current_dir(workspace_path)
+                .output()
+                .ok()
+                .and_then(|output| {
+                    if output.status.success() {
+                        Some(
+                            String::from_utf8_lossy(&output.stdout)
+                                .lines()
+                                .filter_map(|line| {
+                                    line.split_whitespace()
+                                        .last()?
+                                        .strip_prefix("refs/tags/")
+                                        .map(|s| s.to_string())
+                                })
+                                .collect(),
+                        )
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_default();
+        }
+        tags
+    } else {
+        Vec::new()
+    };
+
+    // 1. Query Flathub AppStream API via curl
+    let flathub_version = Command::new("curl")
+        .args([
+            "-sSfL", // Silent, fail fast on HTTP errors, follow redirects
+            &format!("https://flathub.org/api/v2/appstream/{}", app_id),
+        ])
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+
+                // Parse JSON and extract releases[0].version
+                serde_json::from_str::<serde_json::Value>(&stdout)
+                    .ok()
+                    .and_then(|data| {
+                        data.get("releases")
+                            .and_then(|r| r.as_array())
+                            .and_then(|arr| arr.first())
+                            .and_then(|first_release| first_release.get("version"))
+                            .and_then(|v| v.as_str())
+                            .map(|v| v.trim().to_string())
+                            .filter(|v| !v.is_empty())
+                    })
+            } else {
+                None
+            }
+        });
+
+    // 2. If Flathub provided a version, cross-reference with git tags to find prefix
+    if let Some(version) = flathub_version {
+        let prefix = git_tags
+            .iter()
+            .find_map(|tag| {
+                if tag.ends_with(&version) {
+                    Some(tag[..tag.len() - version.len()].to_string())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| {
+                git_tags
+                    .first()
+                    .and_then(|latest_tag| {
+                        let idx = latest_tag.find(|c: char| c.is_ascii_digit())?;
+                        Some(latest_tag[..idx].to_string())
+                    })
+                    .unwrap_or_default()
+            });
+
+        return Some((version, prefix));
+    }
+
+    // 3. Fallback: Parse version and prefix strictly from latest git tag
+    if let Some(latest_tag) = git_tags.first()
+        && let Some(idx) = latest_tag.find(|c: char| c.is_ascii_digit())
+    {
+        let prefix = latest_tag[..idx].to_string();
+        let version = latest_tag[idx..].to_string();
+        if !version.is_empty() {
+            return Some((version, prefix));
         }
     }
 

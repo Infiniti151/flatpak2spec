@@ -4,6 +4,7 @@
 use anyhow::Result;
 use clap::Parser;
 use std::fs;
+use std::io;
 use std::path::PathBuf;
 
 mod manifest;
@@ -64,20 +65,41 @@ impl Cli {
     }
 }
 
-/// Resolves the output path:
+/// Resolves the output path and creates any missing parent directories:
 /// - If None: returns None (stdout).
-/// - If Directory: appends `<default_name>.spec`.
-/// - If File Path: ensures extension is `.spec`.
-pub fn resolve_output_path(output_arg: Option<PathBuf>, default_name: &str) -> Option<PathBuf> {
-    output_arg.map(|path| {
-        if path.is_dir() {
-            path.join(format!("{default_name}.spec"))
-        } else {
-            let mut p = path;
-            p.set_extension("spec");
-            p
+/// - If Directory (exists or ends with trailing separator): creates directory and appends `<default_name>.spec`.
+/// - If File Path: creates parent directories if needed and ensures extension is `.spec`.
+pub fn resolve_output_path(
+    output_arg: Option<PathBuf>,
+    default_name: &str,
+) -> io::Result<Option<PathBuf>> {
+    let Some(path) = output_arg else {
+        return Ok(None);
+    };
+
+    // Treat as directory if it already exists as a dir or explicitly ends with a path separator
+    let is_dir = path.is_dir()
+        || path
+            .to_str()
+            .is_some_and(|s| s.ends_with('/') || s.ends_with('\\'));
+
+    let target = if is_dir {
+        fs::create_dir_all(&path)?;
+        path.join(format!("{default_name}.spec"))
+    } else {
+        let mut p = path;
+        p.set_extension("spec");
+
+        // Create parent directories if a relative/absolute parent exists
+        if let Some(parent) = p.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            fs::create_dir_all(parent)?;
         }
-    })
+        p
+    };
+
+    Ok(Some(target))
 }
 
 fn main() {
@@ -135,7 +157,7 @@ fn run() -> Result<()> {
     let spec_content = SpecGenerator::generate(&manifest, &meson_proj, &workspace, &cli);
 
     // 5. Output Handling (Write to file or stdout)
-    if let Some(out_path) = resolve_output_path(cli.output, &app_name) {
+    if let Some(out_path) = resolve_output_path(cli.output, &app_name)? {
         fs::write(&out_path, &spec_content)?;
         print_success(&format!(
             "Successfully wrote spec file to: {}",

@@ -356,11 +356,22 @@ fn is_main_app_module(
 }
 
 fn find_app_id_from_metainfo(workspace_path: &Path) -> Option<String> {
-    let matches = utils::find_matching_files(workspace_path, &[".metainfo.xml", ".appdata.xml"]);
+    let matches = utils::find_matching_files(
+        workspace_path,
+        &[
+            ".metainfo.xml",
+            ".appdata.xml",
+            ".metainfo.xml.in",
+            ".appdata.xml.in",
+            ".metainfo.xml.in.in",
+            ".appdata.xml.in.in",
+        ],
+    );
 
     for path in matches {
         if let Some(file_name) = path.file_name().and_then(|s| s.to_str()) {
             let clean_name = file_name
+                .trim_end_matches(".in")
                 .trim_end_matches(".xml")
                 .trim_end_matches(".metainfo")
                 .trim_end_matches(".appdata");

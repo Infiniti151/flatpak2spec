@@ -12,7 +12,7 @@ use crate::sections::description::DescriptionSection;
 use crate::sections::files::{FilesContext, generate_files_section};
 use crate::sections::header::HeaderSection;
 use crate::sections::scriptlets::ScriptletsSection;
-use crate::utils::find_metainfo_file;
+use crate::utils::{detect_version_and_prefix, find_metainfo_file};
 use std::path::Path;
 
 pub struct SpecGenerator;
@@ -86,7 +86,9 @@ impl SpecGenerator {
         }
 
         // 7. %changelog section
-        let (version, _) = HeaderSection::detect_version_and_prefix(workspace_path)
+        let app_id = manifest.resolve_app_id(workspace_path).unwrap_or_default();
+
+        let (version, _) = detect_version_and_prefix(workspace_path, &app_id)
             .unwrap_or_else(|| ("0.1.0".to_string(), "".to_string()));
         let release = "1";
 

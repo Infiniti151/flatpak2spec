@@ -6,7 +6,6 @@ use crate::meson::MesonProject;
 use crate::utils;
 use regex::Regex;
 use std::path::Path;
-use std::process::Command;
 
 pub struct HeaderSection;
 
@@ -27,7 +26,7 @@ impl HeaderSection {
             .clone()
             .unwrap_or_else(|| app_id.split('.').next_back().unwrap_or("app").to_string());
 
-        let (version, tag_prefix) = Self::detect_version_and_prefix(workspace_path)
+        let (version, tag_prefix) = utils::detect_version_and_prefix(workspace_path, &app_id)
             .unwrap_or_else(|| ("1.0.0".to_string(), "".to_string()));
 
         let tag_value = format!("{}%{{version}}", tag_prefix);
@@ -77,42 +76,6 @@ impl HeaderSection {
 
         header.push_str("\n\n");
         header
-    }
-
-    pub fn detect_version_and_prefix(workspace_path: &Path) -> Option<(String, String)> {
-        // 1. Try Git tags first
-        if workspace_path.join(".git").exists()
-            && let Ok(output) = Command::new("git")
-                .args(["tag", "-l", "--sort=-v:refname"])
-                .current_dir(workspace_path)
-                .output()
-            && output.status.success()
-        {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            if let Some(latest_tag) = stdout.lines().next().map(|s| s.trim())
-                && let Some(idx) = latest_tag.find(|c: char| c.is_ascii_digit())
-            {
-                let prefix = latest_tag[..idx].to_string();
-                let version = latest_tag[idx..].to_string();
-                if !version.is_empty() {
-                    return Some((version, prefix));
-                }
-            }
-        }
-
-        // 2. Fallback to AppStream MetaInfo release tag
-        if utils::has_metainfo_file(workspace_path) {
-            let rel_re = Regex::new(r#"<release\s+version\s*=\s*['"]([^'"]+)['"]"#).ok()?;
-            if let Some(version) = utils::find_and_extract_regex(
-                workspace_path,
-                &["metainfo.xml", "appdata.xml"],
-                &rel_re,
-            ) {
-                return Some((version, "".to_string()));
-            }
-        }
-
-        None
     }
 
     fn detect_summary(workspace_path: &Path, app_name: &str) -> String {

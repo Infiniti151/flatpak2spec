@@ -211,11 +211,6 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Install expect
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y expect
-
       - name: Sign Tarball Archives with SSH Key
         uses: Infiniti151/ssh-asset-signer@b86ddbf3cd4962184e36c45952ecf2a0403529f6 # v1
         with:

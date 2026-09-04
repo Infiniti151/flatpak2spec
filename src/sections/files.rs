@@ -4,9 +4,11 @@
 use crate::manifest::FlatpakManifest;
 use crate::meson::MesonProject;
 use crate::utils::{
-    check_file_extension, detect_systemd_units, has_desktop_file, has_metainfo_file,
+    check_file_extension, detect_systemd_units, find_matching_files, has_desktop_file,
+    has_metainfo_file,
 };
 use std::collections::HashSet;
+use std::fs;
 use std::path::Path;
 
 #[derive(Debug, Clone, Default)]
@@ -22,6 +24,7 @@ pub struct FilesContext {
     pub has_icons: bool,
     pub has_user_service: bool,
     pub has_system_service: bool,
+    pub has_pkgdata: bool,
     pub doc_files: Vec<String>,
     pub license_files: Vec<String>,
 }
@@ -51,6 +54,9 @@ impl FilesContext {
             }
             None => "%{name}".to_string(),
         };
+
+        let has_pkgdata =
+            detect_has_pkgdata(workspace, &raw_project_name, &binary_name, manifest_id);
 
         // Collect extra binaries from Meson targets (executables & custom_targets)
         let mut extra_binaries = Vec::new();
@@ -91,6 +97,7 @@ impl FilesContext {
             has_icons,
             has_user_service: systemd.has_user,
             has_system_service: systemd.has_system,
+            has_pkgdata,
             doc_files,
             license_files,
         }
@@ -104,6 +111,51 @@ fn format_binary_macro(binary: &str, project_name: &str) -> String {
     } else {
         binary.to_string()
     }
+}
+
+/// Detects if the project explicitly installs dedicated files/dirs into %{_datadir}/<app>.
+fn detect_has_pkgdata(
+    workspace: &Path,
+    project_name: &str,
+    binary_name: &str,
+    manifest_id: Option<&str>,
+) -> bool {
+    // Replaces custom traversal: find_matching_files recursively finds all meson.build files
+    // while automatically filtering out .git, subprojects, build, _build, and vendor.
+    let meson_files = find_matching_files(workspace, &["meson.build"]);
+
+    for meson_path in meson_files {
+        if let Ok(content) = fs::read_to_string(&meson_path) {
+            // 1. Explicit use of pkgdatadir in install targets
+            if content.contains("pkgdatadir")
+                && (content.contains("install_dir") || content.contains("install_data"))
+            {
+                return true;
+            }
+
+            // 2. Custom directory installs (e.g., Python/GJS app assets)
+            if content.contains("install_subdir") {
+                return true;
+            }
+
+            // 3. Direct installation into datadir subfolder
+            if content.contains("get_option('datadir')")
+                || content.contains("get_option('datadir') /")
+            {
+                let candidates = [Some(project_name), Some(binary_name), manifest_id];
+                for candidate in candidates.into_iter().flatten() {
+                    if !candidate.is_empty()
+                        && content.contains(candidate)
+                        && content.contains("install_dir")
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    false
 }
 
 /// Scans the workspace root for standard license and documentation files.
@@ -189,13 +241,15 @@ pub fn generate_files_section(ctx: &FilesContext) -> String {
     }
 
     // 4. Data Directories
-    out.push_str(&format!("%{{_datadir}}/{}\n", ctx.binary_name));
+    if ctx.has_pkgdata {
+        out.push_str(&format!("%{{_datadir}}/{}\n", ctx.binary_name));
+    }
 
     if ctx.has_desktop {
-        out.push_str("%{_datadir}/applications/%{app_id}.desktop\n");
+        out.push_str("%{_datadir}/applications/*.desktop\n");
     }
     if ctx.has_icons {
-        out.push_str("%{_datadir}/icons/hicolor/*/apps/%{app_id}*\n");
+        out.push_str("%{_datadir}/icons/hicolor/*/apps/*\n");
     }
     if ctx.has_schemas {
         out.push_str("%{_datadir}/glib-2.0/schemas/*.gschema.xml\n");
@@ -206,7 +260,7 @@ pub fn generate_files_section(ctx: &FilesContext) -> String {
 
     // 5. MetaInfo
     if ctx.has_metainfo {
-        out.push_str("%{_metainfodir}/%{app_id}.metainfo.xml\n");
+        out.push_str("%{_metainfodir}/*.metainfo.xml\n");
     }
 
     // 6. Systemd Units

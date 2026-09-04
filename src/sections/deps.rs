@@ -2,7 +2,9 @@
 // Copyright (C) 2026 Infiniti151
 
 use crate::meson::MesonProject;
-use crate::utils::{check_file_extension, has_desktop_file, has_metainfo_file};
+use crate::utils::{
+    check_file_extension, find_matching_files, has_desktop_file, has_metainfo_file,
+};
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -121,6 +123,69 @@ impl DepsSection {
             requires.insert("hicolor-icon-theme".to_string());
         } else if has_desktop_file(workspace_path) {
             requires.insert("hicolor-icon-theme".to_string());
+        }
+
+        // 10. Cargo.toml dependency detection
+        let cargo_tomls = find_matching_files(workspace_path, &["Cargo.toml"]);
+        for toml_path in cargo_tomls {
+            if let Ok(content) = std::fs::read_to_string(&toml_path) {
+                if content.contains("libadwaita") {
+                    let brs = [
+                        "libadwaita-devel",
+                        "gtk4-devel",
+                        "glib2-devel",
+                        "pango-devel",
+                        "cairo-devel",
+                        "gdk-pixbuf2-devel",
+                    ];
+                    let reqs = [
+                        "libadwaita",
+                        "gtk4",
+                        "glib2",
+                        "pango",
+                        "cairo",
+                        "gdk-pixbuf2",
+                    ];
+                    for b in brs {
+                        build_requires.insert(b.to_string());
+                    }
+                    for r in reqs {
+                        requires.insert(r.to_string());
+                    }
+                }
+
+                if content.contains("gtk4") {
+                    let brs = [
+                        "gtk4-devel",
+                        "glib2-devel",
+                        "pango-devel",
+                        "cairo-devel",
+                        "gdk-pixbuf2-devel",
+                    ];
+                    let reqs = ["gtk4", "glib2", "pango", "cairo", "gdk-pixbuf2"];
+                    for b in brs {
+                        build_requires.insert(b.to_string());
+                    }
+                    for r in reqs {
+                        requires.insert(r.to_string());
+                    }
+                }
+
+                if content.contains("gstreamer") {
+                    let brs = [
+                        "gstreamer1-devel",
+                        "gstreamer1-plugins-base-devel",
+                        "glib2-devel",
+                    ];
+                    let reqs = ["gstreamer1", "gstreamer1-plugins-base", "glib2"];
+                    for b in brs {
+                        build_requires.insert(b.to_string());
+                    }
+                    for r in reqs {
+                        requires.insert(r.to_string());
+                    }
+                }
+            }
         }
 
         // Format output string
