@@ -1,7 +1,7 @@
 %global         debug_package %{nil}
 
 Name:           flatpak2spec
-Version:        0.3.0
+Version:        0.4.0
 Release:        1%{?dist}
 Summary:        CLI tool to generate Fedora-compliant RPM spec files from Flatpak repositories
 License:        GPL-3.0-or-later
@@ -62,6 +62,19 @@ install -D -m 0755 %{name} %{buildroot}%{_bindir}/%{name}
 %{_bindir}/%{name}
 
 %changelog
+* Fri Sep 04 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 0.4.0-1
+- Update git-cliff configuration for scope grouping
+- Add dependabot for cargo
+- Change dependabot commit prefix
+- Bump dtolnay/rust-toolchain
+- Fix spec file changelog formatting
+- Use ssh-asset-signer action to sign tarballs instead of expect implementation
+- Remove orphan step
+- Make datadir dependency check more robust
+- Correctly resolve app_id to avoid double-suffixed metainfo names
+- Use the correct git-cliff action
+- ... see upstream for full release notes
+
 * Mon Aug 03 2026 Infiniti151 <43163551+Infiniti151@users.noreply.github.com> - 0.3.0-1
 - Expand doc scanning targets to include AUTHORS, CONTRIBUTORS, and TODO
 - Resolve external Module::Path and Source::Path files dynamically

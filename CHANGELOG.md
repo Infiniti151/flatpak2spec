@@ -1,5 +1,47 @@
 # Changelog
 
+## [0.4.0] - 2026-09-04
+
+### ⚙️ Continuous Integration
+- (**changelog**) Update git-cliff configuration for scope grouping
+- (**dependabot**) Add dependabot for cargo
+- (**deps**) Change dependabot commit prefix
+- (**deps**) Bump dtolnay/rust-toolchain
+- (**release**) Fix spec file changelog formatting
+- (**release**) Use ssh-asset-signer action to sign tarballs instead of expect implementation
+- (**release**) Remove orphan step
+
+### 🐛 Bug Fixes
+- (**files**) Make datadir dependency check more robust
+- (**manifest**) Correctly resolve app_id to avoid double-suffixed metainfo names
+- (**release**) Use the correct git-cliff action
+- (**spec**) Use correct detected tag prefix in %global tag
+- (**spec**) Use glob patterns in %files section for artifacts
+- (**version**) Fetch latest released version from Flathub AppStream API
+- (**workspace**) Checkout repository to the latest fetched release tag
+
+### 💡 Other Changes
+- (**deps**) Bump clap from 4.6.4 to 4.6.5 in the app-dependencies group
+- (**deps**) Bump dtolnay/rust-toolchain
+- (**deps**) Bump clap from 4.6.5 to 4.6.6 in the app-dependencies group
+
+### 📚 Documentation
+- (**changelog**) Update the full changelog in git-cliff format
+- (**readme**) Add instructions to download tarball and sig
+- (**readme**) Add build attestation verification section
+- (**repository**) Update doc comments
+- (**spec**) Fix changelog entries
+- (**spec**) Format %description section correctly
+
+### 🚀 Features
+- (**cli**) Automatically create missing target directories for -o flag
+- (**deps**) Parse Cargo.toml to detect GTK4, Libadwaita, and GStreamer dependencies
+- (**release**) Add artifact caching to optimize build process
+
+### 🛠️ Dependencies
+- (**deps**) Bump clap from 4.6.4 to 4.6.5 in the app-dependencies group
+- (**deps**) Bump clap from 4.6.5 to 4.6.6 in the app-dependencies group
+- (**deps**) Update cargo dependencies
 ## [0.3.0] - 2026-08-03
 
 ### 🚀 Features
