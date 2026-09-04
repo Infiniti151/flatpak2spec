@@ -11,16 +11,34 @@ body = """
 {% for entry in commits | commit_groups(groups=commit_parsers_groups) %}
     {%- if entry.commits %}
     ### {{ entry.group | upper_first }}
-    {%- for scope, scope_commits in entry.commits | group_by(attribute="scope") %}
-        {%- for commit in scope_commits | unique(attribute="message") %}
-            - {% if commit.scope %}(**{{ commit.scope }}**) {% endif -%}
-            {%- if commit.message is starting_with("ci(deps)") -%}
-                {{ commit.message | split(pat="\n") | nth(n=1) | upper_first | trim }}
-            {%- else -%}
-                {{ commit.message | upper_first | trim }}
-            {%- endif -%}
+    
+    {%- if entry.group == "🛠️ Dependencies" %}
+        {%- for scope, scope_commits in entry.commits | group_by(attribute="scope") %}
+            {%- if scope != "deps" and scope != "" %}
+                {# Specific package bumps (e.g. clap) -> Only output the newest one, hardcode (deps) #}
+                {%- set commit = scope_commits | last %}
+                - (**deps**) {{ commit.message | upper_first | trim }}
+            {%- else %}
+                {# Generic deps updates -> Loop through all normally, hardcode (deps) #}
+                {%- for commit in scope_commits | unique(attribute="message") %}
+                    - (**deps**) {{ commit.message | upper_first | trim }}
+                {%- endfor %}
+            {%- endif %}
         {%- endfor %}
-    {%- endfor %}
+        
+    {%- else %}
+        {# Standard rendering for all other sections #}
+        {%- for scope, scope_commits in entry.commits | group_by(attribute="scope") %}
+            {%- for commit in scope_commits | unique(attribute="message") %}
+                - {% if commit.scope %}(**{{ commit.scope }}**) {% endif -%}
+                {%- if commit.message is starting_with("ci(deps)") -%}
+                    {{ commit.message | split(pat="\n") | nth(n=1) | upper_first | trim }}
+                {%- else -%}
+                    {{ commit.message | upper_first | trim }}
+                {%- endif -%}
+            {%- endfor %}
+        {%- endfor %}
+    {%- endif %}
     {%- endif %}
 {% endfor %}
 """
@@ -44,6 +62,7 @@ commit_parsers = [
     { message = "^build", group = "📦 Build System" },
     { message = "^ci", group = "⚙️ Continuous Integration" },
     { message = ".*chore\\(release\\)", skip = true },
+    { message = "^chore\\(deps\\): [Bb]ump (?P<scope>\\S+)", group = "🛠️ Dependencies" },
     { message = "^chore\\(deps\\)", group = "🛠️ Dependencies" },
     { message = "^chore", group = "🧹 Chores" },
     { message = "^revert", group = "◀️ Reverts" },
