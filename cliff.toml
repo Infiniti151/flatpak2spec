@@ -48,7 +48,7 @@ commit_parsers = [
     { message = "^chore", group = "🧹 Chores" },
     { message = "^revert", group = "◀️ Reverts" },
     { message = "^Merge", skip = true },
-    { message = ".*", group = "💡 Other Changes" },
+    { message = ".*", skip = true },
 ]
 
 sort_commits = "oldest"
