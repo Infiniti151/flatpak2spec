@@ -93,7 +93,7 @@ jobs:
 
       - name: Install Rust stable
         if: steps.cache_binary.outputs.cache-hit != 'true'
-        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
@@ -152,7 +152,7 @@ jobs:
           sed -i -E "/name = \"${BIN_NAME}\"/,/version =/ s/(version = \")[^\"]*(\")/\1${VERSION}\2/" Cargo.lock
 
       - name: Generate Latest Release Notes with git-cliff
-        uses: orhun/git-cliff-action@3d96a18cc4ec17e9dc69ddcc424ccafaf1f78ce2 # v4
+        uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4
         with:
           config: cliff.toml
           args: --latest --strip header
@@ -160,7 +160,7 @@ jobs:
           OUTPUT: release_notes.md
 
       - name: Prepend Latest Release to CHANGELOG.md
-        uses: orhun/git-cliff-action@3d96a18cc4ec17e9dc69ddcc424ccafaf1f78ce2 # v4
+        uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4
         with:
           config: cliff.toml
           args: --latest --prepend CHANGELOG.md
